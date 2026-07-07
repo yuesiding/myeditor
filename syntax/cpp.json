@@ -1,0 +1,41 @@
+{
+    "name": "C++",
+    "extensions": ["cpp", "cxx", "cc", "h", "hpp", "hxx"],
+
+    "keywords": [
+        "alignas", "alignof", "and", "asm", "auto", "bool", "break",
+        "case", "catch", "char", "class", "const", "constexpr",
+        "continue", "default", "delete", "do", "double", "else",
+        "enum", "explicit", "export", "extern", "false", "final",
+        "float", "for", "friend", "goto", "if", "inline", "int",
+        "long", "mutable", "namespace", "new", "noexcept", "not",
+        "nullptr", "operator", "or", "override", "private",
+        "protected", "public", "register", "return", "short",
+        "signals", "signed", "sizeof", "slots", "static",
+        "static_cast", "struct", "switch", "template", "this",
+        "throw", "true", "try", "typedef", "typename", "union",
+        "unsigned", "using", "virtual", "void", "volatile",
+        "while", "xor"
+    ],
+
+    "singleLineComment": "//",
+    "multiLineCommentStart": "/*",
+    "multiLineCommentEnd": "*/",
+
+    "stringPatterns": [
+        "\"[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*\"",
+        "'.'"
+    ],
+
+    "numberPattern": "\\b[0-9]+\\.?[0-9]*\\b",
+    "functionPattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()",
+    "preprocessorPattern": "^\\s*#[^\n]*",
+
+    "customPatterns": [
+        {
+            "name": "qtClass",
+            "pattern": "\\bQ[A-Za-z]+\\b",
+            "color": "qtClass"
+        }
+    ]
+}

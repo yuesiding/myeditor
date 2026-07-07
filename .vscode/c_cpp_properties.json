@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "H:/Qt/5.14.2/mingw73_64/include",
+                "H:/Qt/5.14.2/mingw73_64/include/QtCore",
+                "H:/Qt/5.14.2/mingw73_64/include/QtGui",
+                "H:/Qt/5.14.2/mingw73_64/include/QtWidgets"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "compilerPath": "H:/Qt/Tools/mingw730_64/bin/g++.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-gcc-x64"
+        }
+    ],
+    "version": 4
+}

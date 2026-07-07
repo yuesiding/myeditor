@@ -1,0 +1,28 @@
+{
+    "name": "JSON",
+    "extensions": ["json"],
+
+    "keywords": [
+        "true", "false", "null"
+    ],
+
+    "singleLineComment": "",
+    "multiLineCommentStart": "",
+    "multiLineCommentEnd": "",
+
+    "stringPatterns": [
+        "\"[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*\""
+    ],
+
+    "numberPattern": "-?\\b[0-9]+\\.?[0-9]*([eE][+-]?[0-9]+)?\\b",
+    "functionPattern": "",
+    "preprocessorPattern": "",
+
+    "customPatterns": [
+        {
+            "name": "jsonKey",
+            "pattern": "\"[^\"]*\"(?=\\s*:)",
+            "color": "keyword"
+        }
+    ]
+}

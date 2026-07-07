@@ -1,0 +1,9 @@
+{
+    "cmake.generator": "MinGW Makefiles",
+    "cmake.configureSettings": {
+        "CMAKE_PREFIX_PATH": "H:/Qt/5.14.2/mingw73_64",
+        "CMAKE_C_COMPILER": "H:/Qt/Tools/mingw730_64/bin/gcc.exe",
+        "CMAKE_CXX_COMPILER": "H:/Qt/Tools/mingw730_64/bin/g++.exe",
+        "CMAKE_MAKE_PROGRAM": "H:/Qt/Tools/mingw730_64/bin/mingw32-make.exe"
+    }
+}

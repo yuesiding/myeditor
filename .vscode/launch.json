@@ -1,0 +1,30 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug CodeEditor",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/CodeEditor.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build",
+            "environment": [
+                {
+                    "name": "PATH",
+                    "value": "H:/Qt/5.14.2/mingw73_64/bin;H:/Qt/Tools/mingw730_64/bin;${env:PATH}"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "H:/Qt/Tools/mingw730_64/bin/gdb.exe",
+            "setupCommands": [
+                {
+                    "description": "启用 pretty-printing (gdb)",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+        }
+    ]
+}

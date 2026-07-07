@@ -1,0 +1,48 @@
+{
+    "name": "Python",
+    "extensions": ["py", "pyw"],
+
+    "keywords": [
+        "False", "None", "True", "and", "as", "assert", "async",
+        "await", "break", "class", "continue", "def", "del", "elif",
+        "else", "except", "finally", "for", "from", "global", "if",
+        "import", "in", "is", "lambda", "nonlocal", "not", "or",
+        "pass", "raise", "return", "try", "while", "with", "yield",
+        "self", "cls"
+    ],
+
+    "types": [
+        "int", "float", "str", "bool", "list", "dict", "tuple",
+        "set", "frozenset", "bytes", "bytearray", "object",
+        "print", "len", "range", "type", "isinstance", "input",
+        "open", "map", "filter", "zip", "enumerate", "sorted"
+    ],
+
+    "singleLineComment": "#",
+    "multiLineCommentStart": "",
+    "multiLineCommentEnd": "",
+
+    "stringPatterns": [
+        "\"\"\"[\\s\\S]*?\"\"\"",
+        "'''[\\s\\S]*?'''",
+        "\"[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*\"",
+        "'[^'\\\\]*(?:\\\\.[^'\\\\]*)*'"
+    ],
+
+    "numberPattern": "\\b[0-9]+\\.?[0-9]*\\b",
+    "functionPattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()",
+    "preprocessorPattern": "",
+
+    "customPatterns": [
+        {
+            "name": "decorator",
+            "pattern": "@[A-Za-z_][A-Za-z0-9_]*",
+            "color": "preprocessor"
+        },
+        {
+            "name": "magicMethod",
+            "pattern": "__[A-Za-z_]+__",
+            "color": "qtClass"
+        }
+    ]
+}
