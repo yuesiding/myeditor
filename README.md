@@ -1,120 +1,214 @@
-# MyEditor 📝
+<div align="center">
 
-一个用 Qt 5 + C++ 开发的轻量级多语言代码编辑器，支持语法高亮、代码折叠、多标签编辑等功能。
+# 📝 MyEditor
+
+**一个用 Qt 5 + C++ 开发的轻量级多语言代码编辑器**
+
+*支持语法高亮、代码折叠、多标签编辑等专业功能*
+
+![Qt](https://img.shields.io/badge/Qt-5.14.2-41CD52?logo=qt&logoColor=white)
+![C++](https://img.shields.io/badge/C++-17-00599C?logo=cplusplus&logoColor=white)
+![CMake](https://img.shields.io/badge/CMake-3.16+-064F8C?logo=cmake&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+
+</div>
+
+---
 
 ## ✨ 主要特性
 
-### 编辑功能
-- 📝 **多标签页编辑**：同时打开和编辑多个文件
-- 🎨 **语法高亮**：内置支持 C++、Python、JSON
-- 📐 **行号显示** & 当前行高亮
-- 🔗 **括号匹配**：光标旁边的括号自动高亮
-- 📂 **代码折叠**：折叠函数/类，聚焦当前工作
-- 🔍 **查找和替换**：支持大小写、全词、正则表达式
-- ↩️ **自动缩进**：按上一行缩进级别自动对齐
+### 📝 编辑功能
 
-### 界面
-- 🌗 **亮/暗主题**：可自由切换
-- 🌳 **文件树侧边栏**：像 VSCode 一样浏览项目
-- 🛠️ **工具栏**：常用操作一键触发
-- 📊 **专业状态栏**：显示行列号、字符数、折叠数
+- 📑 **多标签页编辑** — 同时打开和编辑多个文件
+- 🎨 **语法高亮** — 内置支持 C++、Python、JSON
+- 📐 **行号显示** 与当前行高亮
+- 🔗 **括号匹配** — 光标旁的括号自动高亮
+- 📂 **代码折叠** — 折叠函数/类，聚焦当前工作
+- 🔍 **查找与替换** — 支持大小写、全词、正则表达式
+- ↩️ **自动缩进** — 按上一行缩进级别自动对齐
 
-### 用户体验
-- 💾 **会话恢复**：重启后自动打开上次的文件
-- 📌 **最近文件**：快速访问最近打开的 10 个文件
-- 🖱️ **拖拽打开**：拖文件到窗口即可打开
-- ⌨️ **命令行支持**：`myeditor.exe file.cpp`
-- 🔎 **字体缩放**：Ctrl + 滚轮
+### 🎨 界面
 
-### 可扩展性
-- 📦 **数据驱动**：语法规则用 JSON 定义，加新语言无需修改代码
-- ⚙️ **首选项对话框**：字体、缩进、主题等可自定义
+- 🌗 **亮/暗主题** — 一键切换
+- 🌳 **文件树侧边栏** — 像 VSCode 一样浏览项目
+- 🛠️ **工具栏** — 常用操作一键触发
+- 📊 **专业状态栏** — 显示行列号、字符数、折叠数
+
+### 💡 用户体验
+
+- 💾 **会话恢复** — 重启后自动打开上次的文件
+- 📌 **最近文件** — 快速访问最近打开的 10 个文件
+- 🖱️ **拖拽打开** — 拖文件到窗口即可打开
+- ⌨️ **命令行支持** — `myeditor.exe file.cpp`
+- 🔎 **字体缩放** — Ctrl + 鼠标滚轮
+
+### 🔧 可扩展性
+
+- 📦 **数据驱动** — 语法规则用 JSON 定义，加新语言无需修改代码
+- ⚙️ **首选项对话框** — 字体、缩进、主题等可自定义
+
+---
 
 ## 📸 截图
 
-（这里以后你可以添加截图）
+> 待补充
+
+---
 
 ## 🛠️ 技术栈
 
-- **框架**：Qt 5.14.2
-- **语言**：C++17
-- **构建系统**：CMake 3.16+
-- **编译器**：MinGW 7.3.0 (64-bit)
+| 类别 | 技术 |
+|------|------|
+| **框架** | Qt 5.14.2 |
+| **语言** | C++17 |
+| **构建系统** | CMake 3.16+ |
+| **编译器** | MinGW 7.3.0 (64-bit) |
 
-## 🚀 构建
+---
 
-### 依赖
-- Qt 5.14.2（MinGW 64-bit）
+## 🚀 快速开始
+
+### 方式一：直接使用发布版
+
+如果你不想自己编译，可以直接下载 [Releases](https://github.com/yuesiding/myeditor/releases) 里的 ZIP 包，解压后双击 `CodeEditor.exe` 即可运行。
+
+### 方式二：从源码编译
+
+**依赖**：
+
+- Qt 5.14.2（MinGW 64-bit 版本）
 - CMake 3.16 或更高版本
 - MinGW 7.3.0 或兼容版本
 
-### 编译步骤
+**编译步骤**：
 
 ```bash
-# 克隆仓库
+# 1. 克隆仓库
 git clone https://github.com/yuesiding/myeditor.git
 cd myeditor
 
-# 使用 CMake 构建
+# 2. 创建构建目录
 mkdir build
 cd build
+
+# 3. 使用 CMake 生成 Makefile
 cmake -G "MinGW Makefiles" ..
+
+# 4. 编译
 mingw32-make
+```
 
+编译完成后，`build/` 目录下会生成 `CodeEditor.exe`。
 
-📦 使用发布版
-如果你不想自己编译，可以直接下载 Releases 里的 ZIP 包，解压后双击 CodeEditor.exe 即可运行。
+---
 
-🎓 项目背景
-这是一个学习 Qt 的完整项目，从零开始一步步实现。涉及的核心技术：
+## 🎓 项目背景
 
-QMainWindow / QPlainTextEdit / QTabWidget
-QSyntaxHighlighter + QRegularExpression
-单例模式（ThemeManager, SyntaxManager）
-观察者模式（信号槽）
-MVC 模式（QFileSystemModel + QTreeView）
-配置驱动的可扩展架构（JSON 语法定义）
-📁 项目结构
+这是一个学习 Qt 的完整项目，从零开始一步步实现。
+
+### 涉及的核心技术
+
+- **Qt 核心类**：`QMainWindow`、`QPlainTextEdit`、`QTabWidget`
+- **语法高亮**：`QSyntaxHighlighter` + `QRegularExpression`
+- **单例模式**：`ThemeManager`、`SyntaxManager`
+- **观察者模式**：信号槽机制
+- **MVC 模式**：`QFileSystemModel` + `QTreeView`
+- **配置驱动**：JSON 语法定义，可扩展架构
+
+---
+
+## 📁 项目结构
+
+```
 myeditor/
-├── main.cpp                    # 程序入口
-├── mainwindow.{h,cpp}          # 主窗口
-├── editorwidget.{h,cpp}        # 编辑器控件
-├── highlighter.{h,cpp}         # 高亮器基类
-├── generichighlighter.{h,cpp}  # 通用高亮器（数据驱动）
-├── syntaxdefinition.{h,cpp}    # 语法定义
-├── syntaxmanager.{h,cpp}       # 语法管理器（单例）
-├── theme.{h,cpp}               # 主题
-├── thememanager.{h,cpp}        # 主题管理器（单例）
-├── findreplacedialog.{h,cpp}   # 查找替换对话框
-├── preferencesdialog.{h,cpp}   # 首选项对话框
-├── filetreewidget.{h,cpp}      # 文件树
-├── syntax/                     # 语法定义 JSON
+├── main.cpp                        # 程序入口
+├── mainwindow.{h,cpp}              # 主窗口
+├── editorwidget.{h,cpp}            # 编辑器控件
+├── highlighter.{h,cpp}             # 高亮器基类
+├── generichighlighter.{h,cpp}      # 通用高亮器（数据驱动）
+├── syntaxdefinition.{h,cpp}        # 语法定义
+├── syntaxmanager.{h,cpp}           # 语法管理器（单例）
+├── theme.{h,cpp}                   # 主题
+├── thememanager.{h,cpp}            # 主题管理器（单例）
+├── findreplacedialog.{h,cpp}       # 查找替换对话框
+├── preferencesdialog.{h,cpp}       # 首选项对话框
+├── filetreewidget.{h,cpp}          # 文件树
+├── syntax/                         # 语法定义 JSON
 │   ├── cpp.json
 │   ├── python.json
 │   └── json.json
-└── CMakeLists.txt
+├── CMakeLists.txt                  # 构建配置
+├── README.md                       # 项目说明
+└── LICENSE                         # 开源许可证
+```
 
-📝 支持添加新语言
-只需在 syntax/ 目录下添加一个 JSON 文件即可：
+---
 
-JSON
+## 🌐 添加新语言支持
 
+只需在 `syntax/` 目录下添加一个 JSON 文件，无需修改任何代码：
+
+```json
 {
     "name": "JavaScript",
-    "extensions": ["js"],
-    "keywords": ["function", "var", "let", "const", "if", "else", ...],
+    "extensions": ["js", "mjs"],
+    "keywords": [
+        "function", "var", "let", "const",
+        "if", "else", "for", "while", "return"
+    ],
     "singleLineComment": "//",
     "multiLineCommentStart": "/*",
     "multiLineCommentEnd": "*/",
-    ...
+    "stringPatterns": [
+        "\"[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*\"",
+        "'[^'\\\\]*(?:\\\\.[^'\\\\]*)*'"
+    ],
+    "numberPattern": "\\b[0-9]+\\.?[0-9]*\\b",
+    "functionPattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()"
 }
+```
 
-📄 License
-MIT License
+---
 
-🙏 致谢
-感谢 Qt 团队提供如此强大的 GUI 框架。
+## ⌨️ 快捷键
 
-text
+| 快捷键 | 功能 |
+|--------|------|
+| `Ctrl + N` | 新建文件 |
+| `Ctrl + O` | 打开文件 |
+| `Ctrl + S` | 保存文件 |
+| `Ctrl + Shift + S` | 另存为 |
+| `Ctrl + F` | 查找与替换 |
+| `Ctrl + Z` | 撤销 |
+| `Ctrl + Y` | 重做 |
+| `Ctrl + B` | 显示/隐藏文件浏览器 |
+| `Ctrl + ,` | 打开首选项 |
+| `Ctrl + +` | 放大字体 |
+| `Ctrl + -` | 缩小字体 |
+| `Ctrl + 0` | 重置字体大小 |
+| `Ctrl + K, Ctrl + 0` | 折叠所有 |
+| `Ctrl + K, Ctrl + J` | 展开所有 |
 
+---
 
+## 📄 License
+
+本项目基于 [MIT License](LICENSE) 开源。
+
+---
+
+## 🙏 致谢
+
+- 感谢 [Qt](https://www.qt.io/) 团队提供如此强大的 GUI 框架
+- 感谢所有开源社区的贡献者
+
+---
+
+<div align="center">
+
+**⭐ 如果这个项目对你有帮助，欢迎 Star 支持！**
+
+Made with ❤️ by [yuesiding](https://github.com/yuesiding)
+
+</div>
