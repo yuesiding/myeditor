@@ -37,6 +37,9 @@ add_executable(CodeEditor
     preferencesdialog.h  
     filetreewidget.cpp     
     filetreewidget.h  
+    task.h                   
+    tasklistwidget.cpp       
+    tasklistwidget.h 
 )
 
 target_link_libraries(CodeEditor PRIVATE Qt5::Widgets)

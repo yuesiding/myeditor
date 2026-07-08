@@ -14,6 +14,7 @@ class QDropEvent;
 class QToolBar;
 class QDockWidget;
 class FileTreeWidget;
+class TaskListWidget;
 
 class MainWindow : public QMainWindow
 {
@@ -60,12 +61,15 @@ private slots:
     void toggleFileTree();
     void openFolderInTree();
     void onFileTreeDoubleClicked(const QString &filePath);
-        // 🆕 折叠数量变化
-    void updateFoldCount(int count);
-
-    // 🆕 折叠菜单
-    void foldAll();
+       
+    void updateFoldCount(int count); // 🆕 折叠数量变化
+    
+    void foldAll();// 🆕 折叠菜单
     void unfoldAll();
+        
+    void toggleTaskList();// 🆕 任务清单
+        
+    void updateTaskCount(int total, int completed);// 🆕 更新任务数量显示
 private:
     void createMenus();
     EditorWidget *createEditor();
@@ -95,6 +99,12 @@ private:
     QAction *m_toggleFileTreeAction;   // 显示/隐藏菜单项
         
     QLabel *m_foldCountLabel;// 🆕 折叠数量标签
+
+    QDockWidget *m_taskListDock;// 🆕 任务清单
+    TaskListWidget *m_taskListWidget;
+    QAction *m_toggleTaskListAction;
+
+    QLabel *m_taskCountLabel; // 🆕 任务清单标签
 };
 
 #endif // MAINWINDOW_H

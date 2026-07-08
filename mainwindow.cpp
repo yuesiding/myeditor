@@ -4,6 +4,7 @@
 #include "thememanager.h"
 #include "preferencesdialog.h"
 #include "filetreewidget.h"
+#include "tasklistwidget.h"
 #include <QDockWidget>
 #include <QLabel>
 #include <QTabWidget>
@@ -32,6 +33,9 @@ MainWindow::MainWindow(QWidget *parent)
     m_charCountLabel = new QLabel(tr("0 字符"), this);
     m_foldCountLabel = new QLabel(tr(""), this);
 
+    m_taskCountLabel = new QLabel(tr(""), this);   
+    m_taskCountLabel->setMinimumWidth(120);        
+    statusBar()->addPermanentWidget(m_taskCountLabel);   
     m_cursorPositionLabel->setMinimumWidth(120);
     m_encodingLabel->setMinimumWidth(60);
     m_charCountLabel->setMinimumWidth(100);
@@ -63,6 +67,20 @@ MainWindow::MainWindow(QWidget *parent)
     m_fileTreeDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
     addDockWidget(Qt::LeftDockWidgetArea, m_fileTreeDock);
 
+        // 🆕 创建任务清单 dock
+    m_taskListWidget = new TaskListWidget(this);
+        // 🆕 连接任务数量变化 → 状态栏
+    connect(m_taskListWidget, &TaskListWidget::taskCountChanged,
+            this, &MainWindow::updateTaskCount);
+
+    // 立即更新一次
+    updateTaskCount(m_taskListWidget->totalCount(),
+                    m_taskListWidget->completedCount());
+    m_taskListDock = new QDockWidget(tr("任务清单"), this);
+    m_taskListDock->setObjectName("taskListDock");
+    m_taskListDock->setWidget(m_taskListWidget);
+    m_taskListDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    addDockWidget(Qt::RightDockWidgetArea, m_taskListDock);   // 放右边
     // 连接：文件树双击 → 打开文件
     connect(m_fileTreeWidget, &FileTreeWidget::fileDoubleClicked,
             this, &MainWindow::onFileTreeDoubleClicked);
@@ -179,6 +197,15 @@ void MainWindow::createMenus()
     viewMenu->addAction(openFolderAction);
 
     viewMenu->addSeparator();
+
+        // 🆕 显示/隐藏任务清单
+    m_toggleTaskListAction = new QAction(tr("显示任务清单(&T)"), this);
+    m_toggleTaskListAction->setCheckable(true);
+    m_toggleTaskListAction->setChecked(true);
+    m_toggleTaskListAction->setShortcut(tr("Ctrl+T"));
+    connect(m_toggleTaskListAction, &QAction::triggered,
+            this, &MainWindow::toggleTaskList);
+    viewMenu->addAction(m_toggleTaskListAction);
 
             // 🆕 折叠菜单
     viewMenu->addSeparator();
@@ -846,4 +873,33 @@ void MainWindow::unfoldAll()
 {
     EditorWidget *editor = currentEditor();
     if (editor) editor->unfoldAll();
+}
+
+// ============================================================
+// 🆕 任务清单
+// ============================================================
+void MainWindow::toggleTaskList()
+{
+    if (m_taskListDock->isVisible()) {
+        m_taskListDock->hide();
+        m_toggleTaskListAction->setChecked(false);
+    } else {
+        m_taskListDock->show();
+        m_toggleTaskListAction->setChecked(true);
+    }
+}
+
+// ============================================================
+//  任务数量显示
+// ============================================================
+void MainWindow::updateTaskCount(int total, int completed)
+{
+    int pending = total - completed;
+    if (total == 0) {
+        m_taskCountLabel->setText(tr(""));
+    } else {
+        m_taskCountLabel->setText(
+            tr("📋 %1 待办 / %2 完成").arg(pending).arg(completed)
+        );
+    }
 }

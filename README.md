@@ -11,7 +11,7 @@
 ![CMake](https://img.shields.io/badge/CMake-3.16+-064F8C?logo=cmake&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-
+![Version](https://img.shields.io/badge/Version-2.0.0-brightgreen)
 </div>
 
 ---
@@ -42,7 +42,15 @@
 - 🖱️ **拖拽打开** — 拖文件到窗口即可打开
 - ⌨️ **命令行支持** — `myeditor.exe file.cpp`
 - 🔎 **字体缩放** — Ctrl + 鼠标滚轮
+- 
+### 📋 任务管理
 
+- ✅ **内置任务清单** — 右侧侧边栏管理待办事项
+- 🎯 **优先级标记** — 高/中/低三级优先级，不同颜色区分
+- 🔍 **智能筛选** — 按全部/未完成/已完成筛选
+- 💾 **自动持久化** — 所有任务自动保存，重启后恢复
+- 📊 **实时统计** — 状态栏显示待办和完成数
+- 🖱️ **便捷操作** — 双击编辑，右键复制/置顶/置底
 ### 🔧 可扩展性
 
 - 📦 **数据驱动** — 语法规则用 JSON 定义，加新语言无需修改代码
@@ -189,7 +197,7 @@ myeditor/
 | `Ctrl + 0` | 重置字体大小 |
 | `Ctrl + K, Ctrl + 0` | 折叠所有 |
 | `Ctrl + K, Ctrl + J` | 展开所有 |
-
+| `Ctrl + T` | 显示/隐藏任务清单 |
 ---
 
 ## 📄 License
