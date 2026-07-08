@@ -40,6 +40,10 @@ add_executable(CodeEditor
     task.h                   
     tasklistwidget.cpp       
     tasklistwidget.h 
+    commandpalette.cpp       
+    commandpalette.h
+    minimapwidget.cpp        
+    minimapwidget.h 
 )
 
 target_link_libraries(CodeEditor PRIVATE Qt5::Widgets)

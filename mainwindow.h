@@ -15,6 +15,7 @@ class QToolBar;
 class QDockWidget;
 class FileTreeWidget;
 class TaskListWidget;
+class CommandPalette;
 
 class MainWindow : public QMainWindow
 {
@@ -70,6 +71,8 @@ private slots:
     void toggleTaskList();// 🆕 任务清单
         
     void updateTaskCount(int total, int completed);// 🆕 更新任务数量显示
+        
+    void showCommandPalette();// 命令面板
 private:
     void createMenus();
     EditorWidget *createEditor();
@@ -105,6 +108,10 @@ private:
     QAction *m_toggleTaskListAction;
 
     QLabel *m_taskCountLabel; // 🆕 任务清单标签
+        // 🆕 命令面板
+    void registerCommands();
+
+    CommandPalette *m_commandPalette;
 };
 
 #endif // MAINWINDOW_H

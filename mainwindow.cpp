@@ -5,6 +5,7 @@
 #include "preferencesdialog.h"
 #include "filetreewidget.h"
 #include "tasklistwidget.h"
+#include "commandpalette.h"
 #include <QDockWidget>
 #include <QLabel>
 #include <QTabWidget>
@@ -98,7 +99,9 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowTitle(tr("CodeEditor"));
     loadRecentFiles(); //  加载最近文件历史
     setAcceptDrops(true);
-        
+        // 🆕 命令面板
+    m_commandPalette = new CommandPalette(this);
+    registerCommands();
     restoreSession();//  恢复上次会话
     updateRecentFilesMenu();
 }
@@ -146,7 +149,13 @@ void MainWindow::createMenus()
     QMenu *viewMenu = menuBar()->addMenu(tr("视图(&V)"));
 
     QMenu *themeMenu = viewMenu->addMenu(tr("主题(&T)"));
-        // 🆕 字体缩放菜单项
+        // 🆕 命令面板
+    QAction *commandPaletteAction = new QAction(tr("命令面板(&C)..."), this);
+    commandPaletteAction->setShortcut(tr("Ctrl+Shift+P"));
+    connect(commandPaletteAction, &QAction::triggered,
+            this, &MainWindow::showCommandPalette);
+    viewMenu->addAction(commandPaletteAction);   
+    // 🆕 字体缩放菜单项
     viewMenu->addSeparator();
     QAction *zoomInAction = new QAction(tr("放大字体"), this);
     zoomInAction->setShortcut(QKeySequence::ZoomIn);   // Ctrl++
@@ -902,4 +911,79 @@ void MainWindow::updateTaskCount(int total, int completed)
             tr("📋 %1 待办 / %2 完成").arg(pending).arg(completed)
         );
     }
+}
+
+// ============================================================
+// 🆕 命令面板
+// ============================================================
+void MainWindow::showCommandPalette()
+{
+    m_commandPalette->showPalette();
+}
+
+void MainWindow::registerCommands()
+{
+    // ===== 文件操作 =====
+    m_commandPalette->addCommand({"📄", tr("新建文件"), "Ctrl+N",
+        [this]() { newFile(); }});
+
+    m_commandPalette->addCommand({"📂", tr("打开文件"), "Ctrl+O",
+        [this]() { openFile(); }});
+
+    m_commandPalette->addCommand({"📁", tr("打开文件夹"), "Ctrl+K Ctrl+O",
+        [this]() { openFolderInTree(); }});
+
+    m_commandPalette->addCommand({"💾", tr("保存"), "Ctrl+S",
+        [this]() { saveFile(); }});
+
+    m_commandPalette->addCommand({"💾", tr("另存为..."), "Ctrl+Shift+S",
+        [this]() { saveAsFile(); }});
+
+    // ===== 编辑操作 =====
+    m_commandPalette->addCommand({"↩️", tr("撤销"), "Ctrl+Z",
+        [this]() { undo(); }});
+
+    m_commandPalette->addCommand({"↪️", tr("重做"), "Ctrl+Y",
+        [this]() { redo(); }});
+
+    m_commandPalette->addCommand({"🔍", tr("查找和替换"), "Ctrl+F",
+        [this]() { showFindReplaceDialog(); }});
+
+    // ===== 视图切换 =====
+    m_commandPalette->addCommand({"🌳", tr("显示/隐藏文件浏览器"), "Ctrl+B",
+        [this]() { toggleFileTree(); }});
+
+    m_commandPalette->addCommand({"📋", tr("显示/隐藏任务清单"), "Ctrl+T",
+        [this]() { toggleTaskList(); }});
+
+    // ===== 主题 =====
+    m_commandPalette->addCommand({"🌞", tr("切换到亮色主题"), "",
+        [this]() { switchToLightTheme(); }});
+
+    m_commandPalette->addCommand({"🌙", tr("切换到暗色主题"), "",
+        [this]() { switchToDarkTheme(); }});
+
+    // ===== 字体 =====
+    m_commandPalette->addCommand({"🔎", tr("放大字体"), "Ctrl++",
+        [this]() { zoomIn(); }});
+
+    m_commandPalette->addCommand({"🔎", tr("缩小字体"), "Ctrl+-",
+        [this]() { zoomOut(); }});
+
+    m_commandPalette->addCommand({"🔎", tr("重置字体大小"), "Ctrl+0",
+        [this]() { resetZoom(); }});
+
+    // ===== 代码折叠 =====
+    m_commandPalette->addCommand({"📂", tr("折叠所有"), "Ctrl+K Ctrl+0",
+        [this]() { foldAll(); }});
+
+    m_commandPalette->addCommand({"📖", tr("展开所有"), "Ctrl+K Ctrl+J",
+        [this]() { unfoldAll(); }});
+
+    // ===== 其他 =====
+    m_commandPalette->addCommand({"⚙️", tr("首选项"), "Ctrl+,",
+        [this]() { showPreferences(); }});
+
+    m_commandPalette->addCommand({"❌", tr("退出"), "Ctrl+Q",
+        [this]() { close(); }});
 }

@@ -3,8 +3,8 @@
 #include "thememanager.h"
 #include "generichighlighter.h"
 #include "syntaxmanager.h"
+#include "minimapwidget.h"
 #include <QDebug>
-
 #include <QFile>
 #include <QTextStream>
 #include <QFileInfo>
@@ -48,7 +48,9 @@ EditorWidget::EditorWidget(QWidget *parent)
 
     m_lineNumberArea = new LineNumberArea(this);
     m_foldArea = new FoldArea(this);   
-
+        // 🆕 创建迷你地图
+    m_minimap = new MinimapWidget(this, this);
+    m_showMinimap = true;
     connect(this, &EditorWidget::blockCountChanged,
             this, &EditorWidget::updateLineNumberAreaWidth);
     connect(this, &EditorWidget::updateRequest,
@@ -109,7 +111,9 @@ int EditorWidget::lineNumberAreaWidth()
 
 void EditorWidget::updateLineNumberAreaWidth(int)
 {
-    setViewportMargins(lineNumberAreaWidth() + foldAreaWidth(), 0, 0, 0);
+    // 🆕 左边留行号+折叠区，右边留迷你地图
+    int rightMargin = m_showMinimap ? minimapWidth() : 0;
+    setViewportMargins(lineNumberAreaWidth() + foldAreaWidth(), 0, rightMargin, 0);
 }
 
 void EditorWidget::updateLineNumberArea(const QRect &rect, int dy)
@@ -136,11 +140,21 @@ void EditorWidget::resizeEvent(QResizeEvent *event)
         QRect(cr.left(), cr.top(), lineNumberAreaWidth(), cr.height())
     );
 
-    // 🆕 折叠区域（在行号栏右边）
+    // 折叠区域
     m_foldArea->setGeometry(
         QRect(cr.left() + lineNumberAreaWidth(), cr.top(),
               foldAreaWidth(), cr.height())
     );
+
+    // 🆕 迷你地图（右侧）
+    if (m_showMinimap && m_minimap) {
+        int mmWidth = minimapWidth();
+        m_minimap->setGeometry(
+            QRect(cr.right() - mmWidth + 1, cr.top(),
+                  mmWidth, cr.height())
+        );
+        m_minimap->show();
+    }
 }
 
 void EditorWidget::lineNumberAreaPaintEvent(QPaintEvent *event)
@@ -148,7 +162,15 @@ void EditorWidget::lineNumberAreaPaintEvent(QPaintEvent *event)
     const Theme &theme = ThemeManager::instance().currentTheme();
 
     QPainter painter(m_lineNumberArea);
-    painter.fillRect(event->rect(), theme.lineNumberBackground);
+        // 背景（比编辑区稍暗，形成对比）
+    QColor bgColor = theme.editorBackground;
+    bool isDarkTheme = theme.editorBackground.lightness() < 128;
+    if (isDarkTheme) {
+        bgColor = bgColor.darker(120);   // 暗主题：更暗一点
+    } else {
+        bgColor = bgColor.darker(105);   // 亮主题：稍暗
+    }
+    painter.fillRect(rect(), bgColor);
 
     QTextBlock block = firstVisibleBlock();
     int blockNumber = block.blockNumber();
@@ -917,4 +939,12 @@ void EditorWidget::unfoldAll()
     highlightFoldedLines();
 
     emit foldCountChanged(foldedCount());
+}
+
+// ============================================================
+// 🆕 迷你地图
+// ============================================================
+int EditorWidget::minimapWidth() const
+{
+    return 120;
 }
