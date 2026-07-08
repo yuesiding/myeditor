@@ -6,6 +6,8 @@
 #include "filetreewidget.h"
 #include "tasklistwidget.h"
 #include "commandpalette.h"
+#include "aiassistantwidget.h"
+#include "terminalwidget.h"
 #include <QDockWidget>
 #include <QLabel>
 #include <QTabWidget>
@@ -29,24 +31,30 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), m_findReplaceDialog(nullptr)
 {
+    // ============================================================
+    // 阶段 1: 初始化状态栏 label（必须最先，因为后面各种 update 会用）
+    // ============================================================
     m_cursorPositionLabel = new QLabel(tr("行:1 列:1"), this);
     m_encodingLabel = new QLabel(tr("UTF-8"), this);
     m_charCountLabel = new QLabel(tr("0 字符"), this);
     m_foldCountLabel = new QLabel(tr(""), this);
+    m_taskCountLabel = new QLabel(tr(""), this);
 
-    m_taskCountLabel = new QLabel(tr(""), this);   
-    m_taskCountLabel->setMinimumWidth(120);        
-    statusBar()->addPermanentWidget(m_taskCountLabel);   
     m_cursorPositionLabel->setMinimumWidth(120);
     m_encodingLabel->setMinimumWidth(60);
     m_charCountLabel->setMinimumWidth(100);
     m_foldCountLabel->setMinimumWidth(100);
+    m_taskCountLabel->setMinimumWidth(120);
 
     statusBar()->addPermanentWidget(m_cursorPositionLabel);
     statusBar()->addPermanentWidget(m_encodingLabel);
     statusBar()->addPermanentWidget(m_charCountLabel);
-    statusBar()->addPermanentWidget(m_foldCountLabel); 
-    
+    statusBar()->addPermanentWidget(m_foldCountLabel);
+    statusBar()->addPermanentWidget(m_taskCountLabel);
+
+    // ============================================================
+    // 阶段 2: 创建标签页
+    // ============================================================
     m_tabWidget = new QTabWidget(this);
     m_tabWidget->setTabsClosable(true);
     m_tabWidget->setMovable(true);
@@ -58,52 +66,102 @@ MainWindow::MainWindow(QWidget *parent)
 
     setCentralWidget(m_tabWidget);
 
+    // ============================================================
+    // 阶段 3: 创建菜单和工具栏
+    // ============================================================
     createMenus();
-    createToolBars(); 
-    // 🆕 创建文件树 dock
+    createToolBars();
+
+    // ============================================================
+    // 阶段 4: 创建所有 dock widget（必须在 createEditor 之前）
+    // ============================================================
+
+    // 4.1 文件树 dock（左侧）
     m_fileTreeWidget = new FileTreeWidget(this);
     m_fileTreeDock = new QDockWidget(tr("文件浏览器"), this);
-    m_fileTreeDock->setObjectName("fileTreeDock");   // 用于会话恢复
+    m_fileTreeDock->setObjectName("fileTreeDock");
     m_fileTreeDock->setWidget(m_fileTreeWidget);
     m_fileTreeDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
     addDockWidget(Qt::LeftDockWidgetArea, m_fileTreeDock);
 
-        // 🆕 创建任务清单 dock
-    m_taskListWidget = new TaskListWidget(this);
-        // 🆕 连接任务数量变化 → 状态栏
-    connect(m_taskListWidget, &TaskListWidget::taskCountChanged,
-            this, &MainWindow::updateTaskCount);
+    connect(m_fileTreeWidget, &FileTreeWidget::fileDoubleClicked,
+            this, &MainWindow::onFileTreeDoubleClicked);
 
-    // 立即更新一次
-    updateTaskCount(m_taskListWidget->totalCount(),
-                    m_taskListWidget->completedCount());
+    // 4.2 任务清单 dock（右侧）
+    m_taskListWidget = new TaskListWidget(this);
     m_taskListDock = new QDockWidget(tr("任务清单"), this);
     m_taskListDock->setObjectName("taskListDock");
     m_taskListDock->setWidget(m_taskListWidget);
     m_taskListDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    addDockWidget(Qt::RightDockWidgetArea, m_taskListDock);   // 放右边
-    // 连接：文件树双击 → 打开文件
-    connect(m_fileTreeWidget, &FileTreeWidget::fileDoubleClicked,
-            this, &MainWindow::onFileTreeDoubleClicked);
+    addDockWidget(Qt::RightDockWidgetArea, m_taskListDock);
 
-    // 从 QSettings 恢复上次的文件夹
-    QSettings settings("MyCompany", "CodeEditor");
-    QString lastFolder = settings.value("fileTree/rootPath").toString();
-    if (!lastFolder.isEmpty()) {
-        m_fileTreeWidget->setRootPath(lastFolder);
+    connect(m_taskListWidget, &TaskListWidget::taskCountChanged,
+            this, &MainWindow::updateTaskCount);
+
+    // 4.3 AI 助手 dock（右侧，和任务清单 tab 化）
+    m_aiAssistantWidget = new AiAssistantWidget(this);
+    m_aiDock = new QDockWidget(tr("AI 助手"), this);
+    m_aiDock->setObjectName("aiDock");
+    m_aiDock->setWidget(m_aiAssistantWidget);
+    m_aiDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    addDockWidget(Qt::RightDockWidgetArea, m_aiDock);
+
+    // 🆕 创建终端 dock（底部）
+    m_terminalWidget = new TerminalWidget(this);
+    m_terminalDock = new QDockWidget(tr("终端 / 输出"), this);
+    m_terminalDock->setObjectName("terminalDock");
+    m_terminalDock->setWidget(m_terminalWidget);
+    m_terminalDock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
+    addDockWidget(Qt::BottomDockWidgetArea, m_terminalDock);
+    m_terminalDock->hide();   // 默认隐藏，运行时自动显示
+
+    // 让 AI 助手和任务清单 tab 化（切换显示）
+    tabifyDockWidget(m_taskListDock, m_aiDock);
+
+    // 默认显示任务清单在前
+    m_taskListDock->raise();
+
+    // 立即更新任务数量
+    updateTaskCount(m_taskListWidget->totalCount(),
+                    m_taskListWidget->completedCount());
+
+    // ============================================================
+    // 阶段 5: 从 QSettings 恢复文件树目录
+    // ============================================================
+    {
+        QSettings settings("MyCompany", "CodeEditor");
+        QString lastFolder = settings.value("fileTree/rootPath").toString();
+        if (!lastFolder.isEmpty()) {
+            m_fileTreeWidget->setRootPath(lastFolder);
+        }
     }
 
-    createEditor();   // ← 这里会触发 onCurrentTabChanged，  必须让状态栏先初始化好
+    // ============================================================
+    // 阶段 6: 创建初始编辑器（现在所有 widget 都准备好了）
+    // ============================================================
+    createEditor();
 
-    resize(900, 600);
-    setWindowTitle(tr("CodeEditor"));
-    loadRecentFiles(); //  加载最近文件历史
-    setAcceptDrops(true);
-        // 🆕 命令面板
+    // ============================================================
+    // 阶段 7: 命令面板
+    // ============================================================
     m_commandPalette = new CommandPalette(this);
     registerCommands();
-    restoreSession();//  恢复上次会话
+
+    // ============================================================
+    // 阶段 8: 窗口设置
+    // ============================================================
+    resize(1200, 800);   // 🆕 默认大小改大一点
+    setWindowTitle(tr("CodeEditor"));
+
+    // ============================================================
+    // 阶段 9: 加载最近文件 + 会话恢复
+    // ============================================================
+    loadRecentFiles();
     updateRecentFilesMenu();
+    setAcceptDrops(true);
+
+    // 🆕 最后再恢复会话（这时候所有依赖的都准备好了）
+    restoreSession();
 }
 
 MainWindow::~MainWindow()
@@ -145,6 +203,20 @@ void MainWindow::createMenus()
     connect(exitAction, &QAction::triggered, this, &QWidget::close);
     fileMenu->addAction(exitAction);
 
+        // 🆕 运行菜单
+    QMenu *runMenu = menuBar()->addMenu(tr("运行(&R)"));
+    m_runAction = new QAction(tr("▶ 运行当前文件"), this);
+    m_runAction->setShortcut(tr("F5"));
+    connect(m_runAction, &QAction::triggered, this, &MainWindow::runCurrentFile);
+    runMenu->addAction(m_runAction);
+
+    QAction *stopAction = new QAction(tr("⏹️ 停止运行"), this);
+    stopAction->setShortcut(tr("Shift+F5"));
+    connect(stopAction, &QAction::triggered, [this]() {
+        if (m_terminalWidget) m_terminalWidget->stopProcess();
+    });
+    runMenu->addAction(stopAction);
+
         // ===== 🆕 视图菜单 =====
     QMenu *viewMenu = menuBar()->addMenu(tr("视图(&V)"));
 
@@ -182,6 +254,15 @@ void MainWindow::createMenus()
             this, &MainWindow::switchToDarkTheme);
     themeMenu->addAction(darkThemeAction);
 
+        // 🆕 显示/隐藏终端
+    m_toggleTerminalAction = new QAction(tr("显示终端(&M)"), this);
+    m_toggleTerminalAction->setCheckable(true);
+    m_toggleTerminalAction->setChecked(false);
+    m_toggleTerminalAction->setShortcut(tr("Ctrl+`"));
+    connect(m_toggleTerminalAction, &QAction::triggered,
+            this, &MainWindow::toggleTerminal);
+    viewMenu->addAction(m_toggleTerminalAction);
+
     // ===== 🆕 编辑菜单 =====
     QMenu *editMenu = menuBar()->addMenu(tr("编辑(&E)"));
 
@@ -215,6 +296,15 @@ void MainWindow::createMenus()
     connect(m_toggleTaskListAction, &QAction::triggered,
             this, &MainWindow::toggleTaskList);
     viewMenu->addAction(m_toggleTaskListAction);
+
+        // 🆕 显示/隐藏 AI 助手
+    m_toggleAiAction = new QAction(tr("显示 AI 助手(&I)"), this);
+    m_toggleAiAction->setCheckable(true);
+    m_toggleAiAction->setChecked(true);
+    m_toggleAiAction->setShortcut(tr("Ctrl+I"));
+    connect(m_toggleAiAction, &QAction::triggered,
+            this, &MainWindow::toggleAiAssistant);
+    viewMenu->addAction(m_toggleAiAction);
 
             // 🆕 折叠菜单
     viewMenu->addSeparator();
@@ -679,6 +769,23 @@ void MainWindow::createToolBars()
     findAct->setShortcut(QKeySequence::Find);
     findAct->setToolTip(tr("查找和替换 (Ctrl+F)"));
     connect(findAct, &QAction::triggered, this, &MainWindow::showFindReplaceDialog);
+
+        // 🆕 运行工具栏
+    QToolBar *runToolBar = addToolBar(tr("运行"));
+    runToolBar->setObjectName("runToolBar");
+    runToolBar->setIconSize(QSize(20, 20));
+
+    QAction *runAct = runToolBar->addAction(tr("▶ 运行"));
+    runAct->setShortcut(tr("F5"));
+    runAct->setToolTip(tr("运行当前文件 (F5)"));
+    connect(runAct, &QAction::triggered, this, &MainWindow::runCurrentFile);
+
+    QAction *stopAct = runToolBar->addAction(tr("⏹️ 停止"));
+    stopAct->setShortcut(tr("Shift+F5"));
+    stopAct->setToolTip(tr("停止运行 (Shift+F5)"));
+    connect(stopAct, &QAction::triggered, [this]() {
+        if (m_terminalWidget) m_terminalWidget->stopProcess();
+    });
 }
 
 // ===== 🆕 撤销重做槽函数 =====
@@ -986,4 +1093,98 @@ void MainWindow::registerCommands()
 
     m_commandPalette->addCommand({"❌", tr("退出"), "Ctrl+Q",
         [this]() { close(); }});
+        m_commandPalette->addCommand({"🤖", tr("显示/隐藏 AI 助手"), "Ctrl+I",
+        [this]() { toggleAiAssistant(); }});
+
+        m_commandPalette->addCommand({"▶", tr("运行当前文件"), "F5",
+        [this]() { runCurrentFile(); }});
+
+    m_commandPalette->addCommand({"⏹️", tr("停止运行"), "Shift+F5",
+        [this]() { if (m_terminalWidget) m_terminalWidget->stopProcess(); }});
+
+    m_commandPalette->addCommand({"📤", tr("显示/隐藏终端"), "Ctrl+`",
+        [this]() { toggleTerminal(); }});
+}
+
+// ============================================================
+// 🆕 AI 助手
+// ============================================================
+void MainWindow::toggleAiAssistant()
+{
+    if (m_aiDock->isVisible()) {
+        m_aiDock->hide();
+        m_toggleAiAction->setChecked(false);
+    } else {
+        m_aiDock->show();
+        m_aiDock->raise();
+        m_toggleAiAction->setChecked(true);
+    }
+}
+
+// ============================================================
+// 🆕 AI 代码处理接口
+// ============================================================
+void MainWindow::askAiAboutCode(const QString &prompt, const QString &code)
+{
+    if (!m_aiAssistantWidget) return;
+
+    // 确保 AI 助手 dock 显示并置前
+    m_aiDock->show();
+    m_aiDock->raise();
+    m_toggleAiAction->setChecked(true);
+
+    // 🆕 如果 prompt 和 code 都是空的，只显示 AI 助手不发送问题
+    if (prompt.isEmpty() && code.isEmpty()) {
+        return;
+    }
+
+    // 组装完整的提问
+    QString fullQuestion;
+    if (code.isEmpty()) {
+        fullQuestion = prompt;
+    } else {
+        fullQuestion = QString("%1\n\n```\n%2\n```").arg(prompt, code);
+    }
+
+    // 调用 AI 助手的公有方法提问
+    m_aiAssistantWidget->askQuestion(fullQuestion);
+}
+
+// ============================================================
+// 🆕 运行代码
+// ============================================================
+void MainWindow::runCurrentFile()
+{
+    EditorWidget *editor = currentEditor();
+    if (!editor) return;
+
+    QString filePath = editor->currentFile();
+    if (filePath.isEmpty()) {
+        QMessageBox::information(this, tr("提示"),
+                                  tr("请先保存文件后再运行"));
+        return;
+    }
+
+    // 如果文件有未保存修改，先保存
+    if (editor->isModified()) {
+        editor->save();
+    }
+
+    // 显示终端 dock
+    m_terminalDock->show();
+    m_toggleTerminalAction->setChecked(true);
+
+    // 运行
+    m_terminalWidget->runFile(filePath);
+}
+
+void MainWindow::toggleTerminal()
+{
+    if (m_terminalDock->isVisible()) {
+        m_terminalDock->hide();
+        m_toggleTerminalAction->setChecked(false);
+    } else {
+        m_terminalDock->show();
+        m_toggleTerminalAction->setChecked(true);
+    }
 }

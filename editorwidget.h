@@ -12,7 +12,7 @@ class LineNumberArea;
 class QWheelEvent;
 class LineNumberArea;
 class MinimapWidget;
-
+class QContextMenuEvent;
 
 struct FoldRegion {
     int startLine;   // 起始行（有 `{` 的行）
@@ -73,6 +73,8 @@ protected:
     void wheelEvent(QWheelEvent *event) override;
         // 🆕 重写绘制（用于在折叠行末画提示）
     void paintEvent(QPaintEvent *event) override;
+        // 🆕 右键菜单
+    void contextMenuEvent(QContextMenuEvent *event) override;
 private slots:
     void updateLineNumberAreaWidth(int newBlockCount);
     void updateLineNumberArea(const QRect &rect, int dy);

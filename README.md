@@ -11,7 +11,7 @@
 ![CMake](https://img.shields.io/badge/CMake-3.16+-064F8C?logo=cmake&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-![Version](https://img.shields.io/badge/Version-2.0.0-brightgreen)
+![Version](https://img.shields.io/badge/Version-3.0.0-brightgreen)
 </div>
 
 ---
@@ -51,6 +51,30 @@
 - 💾 **自动持久化** — 所有任务自动保存，重启后恢复
 - 📊 **实时统计** — 状态栏显示待办和完成数
 - 🖱️ **便捷操作** — 双击编辑，右键复制/置顶/置底
+
+### 🤖 AI 智能助手
+
+- 💬 **AI 对话**：内置 DeepSeek AI 助手，可自由问答
+- 📝 **代码解释**：选中代码右键，AI 秒懂
+- 🚀 **代码优化**：AI 给出优化建议
+- 🐛 **AI 找 Bug**：智能分析潜在问题
+- 💡 **代码翻译**：一键转换为 Python
+- 📖 **Markdown 渲染**：AI 回复漂亮排版
+
+### 🚀 代码运行
+
+- ▶️ **一键运行**：F5 执行当前文件
+- 🔨 **自动编译**：C++/C 文件自动编译再运行
+- 🖥️ **内置终端**：底部面板显示程序输出
+- ⏹️ **随时中断**：Shift+F5 停止运行
+- 🎨 **多语言支持**：Python、JavaScript、C++、C、Batch
+
+### 🎨 视觉体验
+
+- ⚡ **命令面板**：Ctrl+Shift+P 快速执行所有命令
+- 🗺️ **迷你地图**：右侧代码缩略图
+- 🌗 **亮/暗主题**：一键切换
+
 ### 🔧 可扩展性
 
 - 📦 **数据驱动** — 语法规则用 JSON 定义，加新语言无需修改代码
@@ -72,7 +96,8 @@
 | **语言** | C++17 |
 | **构建系统** | CMake 3.16+ |
 | **编译器** | MinGW 7.3.0 (64-bit) |
-
+| **AI 服务** | DeepSeek API |
+| **网络** | Qt Network + OpenSSL |
 ---
 
 ## 🚀 快速开始
@@ -198,6 +223,11 @@ myeditor/
 | `Ctrl + K, Ctrl + 0` | 折叠所有 |
 | `Ctrl + K, Ctrl + J` | 展开所有 |
 | `Ctrl + T` | 显示/隐藏任务清单 |
+| `Ctrl + Shift + P` | 打开命令面板 |
+| `Ctrl + I` | 显示/隐藏 AI 助手 |
+| `F5` | 运行当前文件 |
+| `Shift + F5` | 停止运行 |
+| `` Ctrl + ` `` | 显示/隐藏终端 |
 ---
 
 ## 📄 License

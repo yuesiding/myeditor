@@ -9,7 +9,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt5 REQUIRED COMPONENTS Widgets)
+find_package(Qt5 REQUIRED COMPONENTS Widgets Network)
 
 add_executable(CodeEditor
     main.cpp
@@ -44,9 +44,13 @@ add_executable(CodeEditor
     commandpalette.h
     minimapwidget.cpp        
     minimapwidget.h 
+    aiassistantwidget.cpp        
+    aiassistantwidget.h
+    terminalwidget.cpp        
+    terminalwidget.h  
 )
 
-target_link_libraries(CodeEditor PRIVATE Qt5::Widgets)
+target_link_libraries(CodeEditor PRIVATE Qt5::Widgets Qt5::Network)
 
 
 add_custom_command(TARGET CodeEditor POST_BUILD

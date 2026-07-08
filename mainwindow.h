@@ -16,6 +16,8 @@ class QDockWidget;
 class FileTreeWidget;
 class TaskListWidget;
 class CommandPalette;
+class AiAssistantWidget;
+class TerminalWidget;
 
 class MainWindow : public QMainWindow
 {
@@ -25,7 +27,8 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
     void openFileByPath(const QString &filePath);
-
+        //  供 EditorWidget 调用：让 AI 处理选中的代码
+    void askAiAboutCode(const QString &prompt, const QString &code);
 protected:
     void closeEvent(QCloseEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
@@ -73,6 +76,9 @@ private slots:
     void updateTaskCount(int total, int completed);// 🆕 更新任务数量显示
         
     void showCommandPalette();// 命令面板
+    void toggleAiAssistant();
+    void runCurrentFile();
+    void toggleTerminal();
 private:
     void createMenus();
     EditorWidget *createEditor();
@@ -110,8 +116,14 @@ private:
     QLabel *m_taskCountLabel; // 🆕 任务清单标签
         // 🆕 命令面板
     void registerCommands();
-
     CommandPalette *m_commandPalette;
+    QDockWidget *m_aiDock;
+    AiAssistantWidget *m_aiAssistantWidget;
+    QAction *m_toggleAiAction;
+    QDockWidget *m_terminalDock;
+    TerminalWidget *m_terminalWidget;
+    QAction *m_toggleTerminalAction;
+    QAction *m_runAction;
 };
 
 #endif // MAINWINDOW_H

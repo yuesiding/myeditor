@@ -4,6 +4,7 @@
 #include "generichighlighter.h"
 #include "syntaxmanager.h"
 #include "minimapwidget.h"
+#include "mainwindow.h"
 #include <QDebug>
 #include <QFile>
 #include <QTextStream>
@@ -18,6 +19,9 @@
 #include <QSettings>
 #include <QMouseEvent>
 #include <QDebug>
+#include <QContextMenuEvent>
+#include <QMenu>
+
 
 // ============================================================
 // LineNumberArea 实现
@@ -947,4 +951,99 @@ void EditorWidget::unfoldAll()
 int EditorWidget::minimapWidth() const
 {
     return 120;
+}
+
+// ============================================================
+// 🆕 自定义右键菜单（含 AI 功能）
+// ============================================================
+void EditorWidget::contextMenuEvent(QContextMenuEvent *event)
+{
+    // 用 Qt 提供的标准菜单作为基础（含剪切、复制、粘贴等）
+    QMenu *menu = createStandardContextMenu();
+
+    // 获取选中的代码
+    QString selectedCode = textCursor().selectedText();
+
+    // 如果有选中代码，就加 AI 相关菜单
+    if (!selectedCode.isEmpty()) {
+        // Qt 的 selectedText 会用 \u2029 代替换行符，要替换回来
+        selectedCode.replace(QChar(0x2029), '\n');
+
+        menu->addSeparator();
+
+        // 找到父窗口 MainWindow
+        MainWindow *mainWin = nullptr;
+        QWidget *p = parentWidget();
+        while (p) {
+            mainWin = qobject_cast<MainWindow *>(p);
+            if (mainWin) break;
+            p = p->parentWidget();
+        }
+
+        if (mainWin) {
+            // 🤖 AI 解释
+            QAction *explainAct = menu->addAction(tr("🤖 AI 解释这段代码"));
+            connect(explainAct, &QAction::triggered, [mainWin, selectedCode]() {
+                mainWin->askAiAboutCode(
+                    tr("请用中文简洁地解释下面这段代码的功能和实现思路："),
+                    selectedCode);
+            });
+
+            // 🚀 AI 优化
+            QAction *optimizeAct = menu->addAction(tr("🚀 AI 优化这段代码"));
+            connect(optimizeAct, &QAction::triggered, [mainWin, selectedCode]() {
+                mainWin->askAiAboutCode(
+                    tr("请优化下面这段代码，提高性能、可读性或者简洁性。"
+                       "请给出优化后的完整代码，并说明改动了什么："),
+                    selectedCode);
+            });
+
+            // 🐛 AI 找 Bug
+            QAction *bugAct = menu->addAction(tr("🐛 AI 找 Bug"));
+            connect(bugAct, &QAction::triggered, [mainWin, selectedCode]() {
+                mainWin->askAiAboutCode(
+                    tr("请仔细检查下面这段代码，找出可能的 bug、"
+                       "潜在问题、边界情况处理不当的地方："),
+                    selectedCode);
+            });
+
+            // 📝 AI 添加注释
+            QAction *commentAct = menu->addAction(tr("📝 AI 添加详细注释"));
+            connect(commentAct, &QAction::triggered, [mainWin, selectedCode]() {
+                mainWin->askAiAboutCode(
+                    tr("请给下面这段代码添加详细的中文注释，帮助理解每一部分的作用。"
+                       "请返回添加注释后的完整代码："),
+                    selectedCode);
+            });
+
+            // 🌐 AI 翻译成其他语言
+            QAction *translateAct = menu->addAction(tr("🌐 AI 转换为 Python"));
+            connect(translateAct, &QAction::triggered, [mainWin, selectedCode]() {
+                mainWin->askAiAboutCode(
+                    tr("请把下面这段代码用 Python 重新实现，"
+                       "保持相同的功能，并添加必要的注释："),
+                    selectedCode);
+            });
+        }
+    } else {
+        // 没有选中代码时，加"问 AI 一个问题"
+        menu->addSeparator();
+        MainWindow *mainWin = nullptr;
+        QWidget *p = parentWidget();
+        while (p) {
+            mainWin = qobject_cast<MainWindow *>(p);
+            if (mainWin) break;
+            p = p->parentWidget();
+        }
+        if (mainWin) {
+            QAction *askAct = menu->addAction(tr("🤖 打开 AI 助手"));
+            connect(askAct, &QAction::triggered, [mainWin]() {
+                // 只显示 AI 助手，不问问题
+                mainWin->askAiAboutCode(QString(), QString());
+            });
+        }
+    }
+
+    menu->exec(event->globalPos());
+    delete menu;
 }
