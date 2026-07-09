@@ -8,6 +8,7 @@
 #include "commandpalette.h"
 #include "aiassistantwidget.h"
 #include "terminalwidget.h"
+#include "mindmapview.h"
 #include <QDockWidget>
 #include <QLabel>
 #include <QTabWidget>
@@ -26,6 +27,8 @@
 #include <QToolBar>
 #include <QStyle>
 #include <QIcon>
+#include <QStackedWidget>
+#include <QActionGroup>
 
 
 MainWindow::MainWindow(QWidget *parent)
@@ -64,7 +67,21 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_tabWidget, &QTabWidget::currentChanged,
             this, &MainWindow::onCurrentTabChanged);
 
-    setCentralWidget(m_tabWidget);
+        // 🆕 用 QStackedWidget 管理两个模式
+    m_modeStack = new QStackedWidget(this);
+
+    // 编辑器模式：把 tabWidget 作为编辑器模式的内容
+    m_editorModeWidget = m_tabWidget;
+    m_modeStack->addWidget(m_editorModeWidget);   // index 0 = 编辑器
+
+    // 思维导图模式：创建画布
+    m_mindMapView = new MindMapView(this);
+    m_modeStack->addWidget(m_mindMapView);         // index 1 = 思维导图
+
+    setCentralWidget(m_modeStack);
+
+    // 创建模式切换工具栏
+    createModeSwitcher();
 
     // ============================================================
     // 阶段 3: 创建菜单和工具栏
@@ -160,6 +177,12 @@ MainWindow::MainWindow(QWidget *parent)
     updateRecentFilesMenu();
     setAcceptDrops(true);
 
+    // 🆕 监听思维导图文件变化
+    if (m_mindMapView) {
+        connect(m_mindMapView, &MindMapView::fileInfoChanged,
+                this, &MainWindow::updateWindowTitleForMindMap);
+    }
+
     // 🆕 最后再恢复会话（这时候所有依赖的都准备好了）
     restoreSession();
 }
@@ -202,6 +225,27 @@ void MainWindow::createMenus()
     exitAction->setShortcut(QKeySequence::Quit);
     connect(exitAction, &QAction::triggered, this, &QWidget::close);
     fileMenu->addAction(exitAction);
+
+    // 🆕 思维导图菜单
+    QMenu *mindMapMenu = menuBar()->addMenu(tr("思维导图(&M)"));
+
+    QAction *newMindAct = new QAction(tr("🧠 新建思维导图"), this);
+    connect(newMindAct, &QAction::triggered, this, &MainWindow::newMindMap);
+    mindMapMenu->addAction(newMindAct);
+
+    QAction *openMindAct = new QAction(tr("🧠 打开思维导图..."), this);
+    connect(openMindAct, &QAction::triggered, this, &MainWindow::openMindMap);
+    mindMapMenu->addAction(openMindAct);
+
+    mindMapMenu->addSeparator();
+
+    QAction *saveMindAct = new QAction(tr("🧠 保存思维导图"), this);
+    connect(saveMindAct, &QAction::triggered, this, &MainWindow::saveMindMap);
+    mindMapMenu->addAction(saveMindAct);
+
+    QAction *saveAsMindAct = new QAction(tr("🧠 另存为..."), this);
+    connect(saveAsMindAct, &QAction::triggered, this, &MainWindow::saveAsMindMap);
+    mindMapMenu->addAction(saveAsMindAct);
 
         // 🆕 运行菜单
     QMenu *runMenu = menuBar()->addMenu(tr("运行(&R)"));
@@ -1104,6 +1148,14 @@ void MainWindow::registerCommands()
 
     m_commandPalette->addCommand({"📤", tr("显示/隐藏终端"), "Ctrl+`",
         [this]() { toggleTerminal(); }});
+        m_commandPalette->addCommand({"🧠", tr("新建思维导图"), "",
+        [this]() { newMindMap(); }});
+
+    m_commandPalette->addCommand({"🧠", tr("打开思维导图"), "",
+        [this]() { openMindMap(); }});
+
+    m_commandPalette->addCommand({"🧠", tr("保存思维导图"), "",
+        [this]() { saveMindMap(); }});
 }
 
 // ============================================================
@@ -1187,4 +1239,145 @@ void MainWindow::toggleTerminal()
         m_terminalDock->show();
         m_toggleTerminalAction->setChecked(true);
     }
+}
+
+// ============================================================
+// 🆕 模式切换工具栏
+// ============================================================
+void MainWindow::createModeSwitcher()
+{
+    m_modeToolBar = addToolBar(tr("模式"));
+    m_modeToolBar->setObjectName("modeToolBar");
+    m_modeToolBar->setMovable(false);   // 不允许拖动
+    m_modeToolBar->setStyleSheet(
+        "QToolBar { spacing: 4px; padding: 4px; }"
+        "QToolButton { padding: 6px 12px; font-size: 13px; }"
+        "QToolButton:checked { background: #0078D4; color: white; }"
+    );
+
+    // 用 ActionGroup 让两个按钮互斥
+    QActionGroup *group = new QActionGroup(this);
+
+    m_editorModeAction = new QAction(tr("📝 编辑器"), this);
+    m_editorModeAction->setCheckable(true);
+    m_editorModeAction->setChecked(true);   // 默认选中
+    group->addAction(m_editorModeAction);
+    m_modeToolBar->addAction(m_editorModeAction);
+    connect(m_editorModeAction, &QAction::triggered,
+            this, &MainWindow::switchToEditorMode);
+
+    m_mindMapModeAction = new QAction(tr("🧠 思维导图"), this);
+    m_mindMapModeAction->setCheckable(true);
+    group->addAction(m_mindMapModeAction);
+    m_modeToolBar->addAction(m_mindMapModeAction);
+    connect(m_mindMapModeAction, &QAction::triggered,
+            this, &MainWindow::switchToMindMapMode);
+
+    // 把模式工具栏放到最前面（其他工具栏后面已经加了）
+    insertToolBarBreak(m_modeToolBar);   // 换行显示
+}
+
+// ===== 切换到编辑器模式 =====
+void MainWindow::switchToEditorMode()
+{
+    m_modeStack->setCurrentIndex(0);
+    m_editorModeAction->setChecked(true);
+    statusBar()->showMessage(tr("已切换到编辑器模式"), 2000);
+    setWindowTitle(tr("CodeEditor"));   // 🆕 恢复默认标题
+}
+
+// ===== 切换到思维导图模式 =====
+void MainWindow::switchToMindMapMode()
+{
+    m_modeStack->setCurrentIndex(1);
+    m_mindMapModeAction->setChecked(true);
+    statusBar()->showMessage(tr("已切换到思维导图模式"), 2000);
+        updateWindowTitleForMindMap();   // 🆕 更新标题
+}
+
+// ============================================================
+// 🆕 思维导图文件操作
+// ============================================================
+void MainWindow::newMindMap()
+{
+    if (!m_mindMapView) return;
+
+    // 切到思维导图模式
+    switchToMindMapMode();
+
+    m_mindMapView->newMindMap();
+}
+
+void MainWindow::openMindMap()
+{
+    if (!m_mindMapView) return;
+
+    QString filePath = QFileDialog::getOpenFileName(
+        this,
+        tr("打开思维导图"),
+        QString(),
+        tr("思维导图文件 (*.qmind);;所有文件 (*)"));
+
+    if (filePath.isEmpty()) return;
+
+    // 切到思维导图模式
+    switchToMindMapMode();
+
+    m_mindMapView->loadFromFile(filePath);
+}
+
+void MainWindow::saveMindMap()
+{
+    if (!m_mindMapView) return;
+
+    if (m_mindMapView->currentFile().isEmpty()) {
+        // 从未保存过，走另存为
+        saveAsMindMap();
+        return;
+    }
+
+    m_mindMapView->saveToFile(m_mindMapView->currentFile());
+}
+
+void MainWindow::saveAsMindMap()
+{
+    if (!m_mindMapView) return;
+
+    QString filePath = QFileDialog::getSaveFileName(
+        this,
+        tr("保存思维导图"),
+        QString("mindmap.qmind"),
+        tr("思维导图文件 (*.qmind);;所有文件 (*)"));
+
+    if (filePath.isEmpty()) return;
+
+    // 如果没有扩展名，加上 .qmind
+    if (!filePath.endsWith(".qmind", Qt::CaseInsensitive)) {
+        filePath += ".qmind";
+    }
+
+    m_mindMapView->saveToFile(filePath);
+}
+
+// ===== 更新窗口标题（思维导图模式下）=====
+void MainWindow::updateWindowTitleForMindMap()
+{
+    if (!m_mindMapView) return;
+
+    QString title = tr("CodeEditor");
+
+    // 只在思维导图模式下更新
+    if (m_modeStack && m_modeStack->currentIndex() == 1) {
+        QString fileName = m_mindMapView->currentFile();
+        if (fileName.isEmpty()) {
+            fileName = tr("未命名思维导图");
+        } else {
+            fileName = QFileInfo(fileName).fileName();
+        }
+
+        QString modified = m_mindMapView->isModified() ? " *" : "";
+        title = QString("%1%2 - %3").arg(fileName, modified, title);
+    }
+
+    setWindowTitle(title);
 }

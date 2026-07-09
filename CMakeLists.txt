@@ -48,6 +48,12 @@ add_executable(CodeEditor
     aiassistantwidget.h
     terminalwidget.cpp        
     terminalwidget.h  
+    mindmapview.cpp       
+    mindmapview.h
+    mindnode.cpp       
+    mindnode.h  
+    mindedge.cpp        
+    mindedge.h
 )
 
 target_link_libraries(CodeEditor PRIVATE Qt5::Widgets Qt5::Network)

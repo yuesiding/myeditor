@@ -18,6 +18,9 @@ class TaskListWidget;
 class CommandPalette;
 class AiAssistantWidget;
 class TerminalWidget;
+class QStackedWidget;
+class QToolBar;
+class MindMapView;
 
 class MainWindow : public QMainWindow
 {
@@ -79,6 +82,17 @@ private slots:
     void toggleAiAssistant();
     void runCurrentFile();
     void toggleTerminal();
+       
+    void switchToEditorMode(); // 🆕 模式切换
+    void switchToMindMapMode();
+        // 🆕 思维导图文件操作
+    void newMindMap();
+    void openMindMap();
+    void saveMindMap();
+    void saveAsMindMap();
+
+    // 🆕 更新窗口标题（根据当前模式和文件）
+    void updateWindowTitleForMindMap();
 private:
     void createMenus();
     EditorWidget *createEditor();
@@ -124,6 +138,18 @@ private:
     TerminalWidget *m_terminalWidget;
     QAction *m_toggleTerminalAction;
     QAction *m_runAction;
+        // 🆕 应用模式栈
+    void createModeSwitcher();
+    
+    QWidget *m_editorModeWidget;// 🆕 编辑器模式的中心 widget
+
+    MindMapView *m_mindMapView;// 🆕 思维导图模式
+
+    QStackedWidget *m_modeStack;// 🆕 模式栈（切换编辑器/思维导图）
+
+    QToolBar *m_modeToolBar; // 🆕 模式切换工具栏
+    QAction *m_editorModeAction;
+    QAction *m_mindMapModeAction;
 };
 
 #endif // MAINWINDOW_H
