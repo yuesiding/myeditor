@@ -668,7 +668,7 @@ void MindMapView::contextMenuEvent(QContextMenuEvent *event)
     QAction *newAct = menu.addAction(tr("🧠 新建思维导图"));
     QAction *fitAct = menu.addAction(tr("🎯 适应窗口"));
     QAction *resetAct = menu.addAction(tr("↩ 重置视图"));
-
+    QAction *centerAct = menu.addAction(tr("🎯 居中中心节点"));
     menu.addSeparator();
 
     QAction *undoAct = menu.addAction(tr("↶ 撤销"));
@@ -679,12 +679,14 @@ void MindMapView::contextMenuEvent(QContextMenuEvent *event)
 
     QAction *chosen = menu.exec(event->globalPos());
 
-    if (chosen == newAct) {
+        if (chosen == newAct) {
         newMindMap();
     } else if (chosen == fitAct) {
         zoomToFit();
     } else if (chosen == resetAct) {
         resetView();
+    } else if (chosen == centerAct) {    
+        centerCenterNode();
     } else if (chosen == undoAct) {
         undo();
     } else if (chosen == redoAct) {
@@ -706,9 +708,33 @@ void MindMapView::requestAiExpandForNode(MindNode *node)
 
     // 通过 window() 找 MainWindow，调用它的方法
     QWidget *w = window();
-    if (w) {
+    if(w){
         // 用属性传递指针
         QMetaObject::invokeMethod(w, "requestAiExpandFromNode",
             Q_ARG(QVariant, QVariant::fromValue(reinterpret_cast<quintptr>(node))));
     }
+}
+
+// ===== 🆕 居中中心节点 =====
+void MindMapView::centerCenterNode()
+{
+    if (!m_scene) return;
+
+    // 找到中心节点
+    MindNode *centerNode = nullptr;
+    for (QGraphicsItem *item : m_scene->items()) {
+        MindNode *n = dynamic_cast<MindNode*>(item);
+        if (n && n->isCenterNode()) {
+            centerNode = n;
+            break;
+        }
+    }
+
+    if (!centerNode) return;
+
+    // 移到 (0, 0)
+    centerNode->setPos(0, 0);
+
+    // 视图也居中
+    centerOn(0, 0);
 }

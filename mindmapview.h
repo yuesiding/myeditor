@@ -44,6 +44,8 @@ public:
     bool exportToImage(const QString &filePath);
         // 🆕 供节点调用
     void requestAiExpandForNode(MindNode *node);
+        // 🆕 居中中心节点（拉回 (0, 0)）
+    void centerCenterNode();
 signals:
     // 🆕 文件信息变化（通知 MainWindow 更新标题）
     void fileInfoChanged();

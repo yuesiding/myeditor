@@ -17,6 +17,7 @@
 #include <QDateTime>
 #include <QGraphicsView>
 #include <QMetaObject>
+#include <QGuiApplication>
 
 MindNode::MindNode(const QString &text, MindNode *parent)
     : QGraphicsItem()
@@ -53,6 +54,8 @@ MindNode::MindNode(const QString &text, MindNode *parent)
     if (parent) {
         parent->addChild(this);
     }
+        // 🆕 设置 tooltip
+    setToolTip(QObject::tr("双击编辑 | 右键更多操作"));
 }
 
 MindNode::~MindNode()
@@ -214,12 +217,17 @@ void MindNode::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
 // ===== 项变化事件（用于监听位置变化等）=====
 QVariant MindNode::itemChange(GraphicsItemChange change, const QVariant &value)
 {
-    // 中心节点：不允许移动
+    // 🆕 中心节点：只有按住 Shift 才能移动
     if (change == ItemPositionChange && m_isCenterNode) {
-        return pos();
+        // 检查是否按住 Shift
+        if (!(QGuiApplication::keyboardModifiers() & Qt::ShiftModifier)) {
+            // 没按 Shift，禁止移动
+            return pos();
+        }
+        // 按了 Shift，允许移动
     }
 
-    // 🆕 位置变化后：通知所有连线更新
+    // 位置变化后：通知所有连线更新
     if (change == ItemPositionHasChanged) {
         for (MindEdge *edge : m_edges) {
             if (edge) edge->adjust();
@@ -228,7 +236,6 @@ QVariant MindNode::itemChange(GraphicsItemChange change, const QVariant &value)
 
     return QGraphicsItem::itemChange(change, value);
 }
-
 // ===== 属性设置 =====
 void MindNode::setText(const QString &text)
 {
@@ -266,11 +273,11 @@ void MindNode::setCenterNode(bool center)
     m_isCenterNode = center;
 
     if (center) {
-        // 中心节点：橙色，不可拖动
         m_bgColor = QColor("#F39C12");
         m_borderColor = QColor("#B87200");
-        setFlag(QGraphicsItem::ItemIsMovable, false);
-        setCursor(Qt::ArrowCursor);
+        // 🆕 允许移动（但 itemChange 会检查 Shift 键）
+        setFlag(QGraphicsItem::ItemIsMovable, true);
+        setCursor(Qt::PointingHandCursor);
     } else {
         setFlag(QGraphicsItem::ItemIsMovable, true);
         setCursor(Qt::PointingHandCursor);
@@ -278,8 +285,12 @@ void MindNode::setCenterNode(bool center)
 
     updateSize();
     update();
+    if (center) {
+        setToolTip(QObject::tr("中心节点\n按住 Shift 拖动可移动位置"));
+    } else {
+        setToolTip(QObject::tr("双击编辑 | 右键更多操作"));
+    }
 }
-
 // ===== 子节点管理 =====
 void MindNode::addChild(MindNode *child)
 {
@@ -313,6 +324,12 @@ void MindNode::removeEdge(MindEdge *edge)
 void MindNode::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 {
     QMenu menu;
+        // 🆕 中心节点特有：居中
+    QAction *centerAct = nullptr;
+    if (m_isCenterNode) {
+        centerAct = menu.addAction(QObject::tr("🎯 回到中心位置 (0, 0)"));
+        menu.addSeparator();
+    }
 
     // ➕ 添加子节点
     QAction *addChildAct = menu.addAction(QObject::tr("➕ 添加子节点"));
@@ -342,6 +359,22 @@ void MindNode::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
     QAction *chosen = menu.exec(event->screenPos());
 
     if (!chosen) {
+        event->accept();
+        return;
+    }
+
+        if (centerAct && chosen == centerAct) {
+        // 通过 MindMapView 居中
+        if (scene()) {
+            QList<QGraphicsView*> views = scene()->views();
+            for (auto *v : views) {
+                MindMapView *mv = qobject_cast<MindMapView*>(v);
+                if (mv) {
+                    mv->centerCenterNode();
+                    break;
+                }
+            }
+        }
         event->accept();
         return;
     }
@@ -513,7 +546,7 @@ void MindNode::deleteWithChildren()
 // ===== 🆕 记录拖动起始位置 =====
 void MindNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-    // 🆕 先检测是否点击了折叠图标
+    // 先检测是否点击了折叠图标
     if (event->button() == Qt::LeftButton && !m_childNodes.isEmpty()) {
         if (isPointOnFoldIcon(event->pos())) {
             toggleCollapsed();
@@ -522,14 +555,19 @@ void MindNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
         }
     }
 
-    // 记录拖动起始位置
-    if (event->button() == Qt::LeftButton && !m_isCenterNode) {
-        m_dragStartPos = pos();
-        m_isDragging = true;
+    // 🆕 记录拖动起始位置
+    // 中心节点：只有按住 Shift 才记录（可拖动）
+    if (event->button() == Qt::LeftButton) {
+        if (!m_isCenterNode) {
+            m_dragStartPos = pos();
+            m_isDragging = true;
+        } else if (event->modifiers() & Qt::ShiftModifier) {
+            m_dragStartPos = pos();
+            m_isDragging = true;
+        }
     }
     QGraphicsItem::mousePressEvent(event);
 }
-
 // ===== 🆕 拖动结束，生成移动命令 =====
 void MindNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
