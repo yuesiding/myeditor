@@ -9,6 +9,7 @@
 #include "aiassistantwidget.h"
 #include "terminalwidget.h"
 #include "mindmapview.h"
+#include "thememanager.h"
 #include <QDockWidget>
 #include <QLabel>
 #include <QTabWidget>
@@ -29,7 +30,10 @@
 #include <QIcon>
 #include <QStackedWidget>
 #include <QActionGroup>
-
+#include "mindmapaidialog.h"
+#include "mindnode.h"
+#include "mindmapcommands.h"
+#include <QDateTime>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), m_findReplaceDialog(nullptr)
@@ -247,6 +251,24 @@ void MainWindow::createMenus()
     connect(saveAsMindAct, &QAction::triggered, this, &MainWindow::saveAsMindMap);
     mindMapMenu->addAction(saveAsMindAct);
 
+    mindMapMenu->addSeparator();
+
+    QAction *exportAct = new QAction(tr("🖼️ 导出为 PNG 图片..."), this);
+    connect(exportAct, &QAction::triggered, this, &MainWindow::exportMindMapImage);
+    mindMapMenu->addAction(exportAct);
+
+        // 🆕 撤销/重做
+    mindMapMenu->addSeparator();
+
+    QAction *undoMindAct = new QAction(tr("↶ 撤销"), this);
+    undoMindAct->setShortcut(tr("Ctrl+Z"));
+    connect(undoMindAct, &QAction::triggered, this, &MainWindow::mindMapUndo);
+    mindMapMenu->addAction(undoMindAct);
+
+    QAction *redoMindAct = new QAction(tr("↷ 重做"), this);
+    redoMindAct->setShortcut(tr("Ctrl+Y"));
+    connect(redoMindAct, &QAction::triggered, this, &MainWindow::mindMapRedo);
+    mindMapMenu->addAction(redoMindAct);
         // 🆕 运行菜单
     QMenu *runMenu = menuBar()->addMenu(tr("运行(&R)"));
     m_runAction = new QAction(tr("▶ 运行当前文件"), this);
@@ -505,6 +527,28 @@ void MainWindow::showFindReplaceDialog()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    // 🆕 检查思维导图是否有未保存修改
+    if (m_mindMapView && m_mindMapView->isModified()) {
+        auto ret = QMessageBox::warning(
+            this,
+            tr("提示"),
+            tr("思维导图已修改，是否保存？"),
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+
+        if (ret == QMessageBox::Save) {
+            saveMindMap();
+            // 如果保存后还是 modified，说明用户取消了保存对话框
+            if (m_mindMapView->isModified()) {
+                event->ignore();
+                return;
+            }
+        } else if (ret == QMessageBox::Cancel) {
+            event->ignore();
+            return;
+        }
+        // Discard: 继续关闭
+    }
+
     // 先询问未保存的文件
     for (int i = 0; i < m_tabWidget->count(); ++i) {
         EditorWidget *editor = qobject_cast<EditorWidget *>(m_tabWidget->widget(i));
@@ -1380,4 +1424,132 @@ void MainWindow::updateWindowTitleForMindMap()
     }
 
     setWindowTitle(title);
+}
+
+// ============================================================
+// 🆕 思维导图撤销/重做
+// ============================================================
+void MainWindow::mindMapUndo()
+{
+    if (!m_mindMapView) return;
+
+    // 只在思维导图模式下才响应
+    if (m_modeStack && m_modeStack->currentIndex() == 1) {
+        m_mindMapView->undo();
+    } else {
+        // 编辑器模式：走原来的撤销
+        undo();
+    }
+}
+
+void MainWindow::mindMapRedo()
+{
+    if (!m_mindMapView) return;
+
+    if (m_modeStack && m_modeStack->currentIndex() == 1) {
+        m_mindMapView->redo();
+    } else {
+        redo();
+    }
+}
+
+// ============================================================
+// 🆕 导出思维导图图片
+// ============================================================
+void MainWindow::exportMindMapImage()
+{
+    if (!m_mindMapView) return;
+
+    QString filePath = QFileDialog::getSaveFileName(
+        this,
+        tr("导出为 PNG"),
+        QString("mindmap.png"),
+        tr("PNG 图片 (*.png);;所有文件 (*)"));
+
+    if (filePath.isEmpty()) return;
+
+    if (!filePath.endsWith(".png", Qt::CaseInsensitive)) {
+        filePath += ".png";
+    }
+
+    if (m_mindMapView->exportToImage(filePath)) {
+        QMessageBox::information(this, tr("成功"),
+                                 tr("图片已导出到：\n%1").arg(filePath));
+    } else {
+        QMessageBox::warning(this, tr("失败"),
+                             tr("导出失败"));
+    }
+}
+
+// ============================================================
+// 🆕 AI 展开思维导图节点
+// ============================================================
+void MainWindow::requestAiExpandFromNode(QVariant nodePtrVar)
+{
+    MindNode *node = reinterpret_cast<MindNode*>(nodePtrVar.value<quintptr>());
+    if (!node || !m_aiAssistantWidget) return;
+
+    // 收集已有子节点标题
+    QStringList existing;
+    for (MindNode *child : node->childNodes()) {
+        if (child) existing.append(child->text());
+    }
+
+    QString parentTopic = node->text();
+
+    // 显示对话框
+    MindMapAiDialog *dialog = new MindMapAiDialog(parentTopic, this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setProperty("nodePtr",
+        QVariant::fromValue(reinterpret_cast<quintptr>(node)));
+
+    // 一次性连接（关闭对话框时断开）
+    QMetaObject::Connection connReady = connect(
+        m_aiAssistantWidget, &AiAssistantWidget::topicSuggestionsReady,
+        dialog, [dialog](const QStringList &topics) {
+            dialog->setSuggestions(topics);
+        });
+
+    QMetaObject::Connection connError = connect(
+        m_aiAssistantWidget, &AiAssistantWidget::topicSuggestionsError,
+        dialog, [dialog](const QString &err) {
+            dialog->showError(err);
+        });
+
+    connect(dialog, &QDialog::finished, this,
+            [this, connReady, connError, dialog](int result) {
+        disconnect(connReady);
+        disconnect(connError);
+
+        if (result == QDialog::Accepted) {
+            QStringList selected = dialog->selectedTopics();
+            MindNode *parentNode = reinterpret_cast<MindNode*>(
+                dialog->property("nodePtr").value<quintptr>());
+
+            if (parentNode && parentNode->scene() && m_mindMapView) {
+                int i = 0;
+                for (const QString &topic : selected) {
+                    QString newId = QString("node_%1_%2")
+                        .arg(QDateTime::currentMSecsSinceEpoch())
+                        .arg(i);
+
+                    int childCount = parentNode->childNodes().size() + 1;
+                    qreal offsetX = 200;
+                    qreal offsetY = (childCount - 1) * 80 - (childCount / 2) * 40;
+                    QPointF newPos(
+                        parentNode->pos().x() + offsetX,
+                        parentNode->pos().y() + offsetY);
+
+                    AddNodeCommand *cmd = new AddNodeCommand(
+                        parentNode->scene(), parentNode, topic, newPos, newId);
+                    m_mindMapView->undoStack()->push(cmd);
+                    i++;
+                }
+            }
+        }
+    });
+
+    dialog->show();
+
+    m_aiAssistantWidget->requestTopicSuggestions(parentTopic, existing);
 }

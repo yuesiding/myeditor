@@ -12,6 +12,11 @@
 #include <QInputDialog>
 #include <QColorDialog>
 #include <QMessageBox>
+#include "mindmapview.h"
+#include "mindmapcommands.h"
+#include <QDateTime>
+#include <QGraphicsView>
+#include <QMetaObject>
 
 MindNode::MindNode(const QString &text, MindNode *parent)
     : QGraphicsItem()
@@ -23,6 +28,8 @@ MindNode::MindNode(const QString &text, MindNode *parent)
     , m_isCenterNode(false)
     , m_isHovered(false)
     , m_parentNode(parent)
+    , m_isDragging(false)
+    , m_collapsed(false)
 {
     // 让节点能被选中
     setFlag(QGraphicsItem::ItemIsSelectable, true);
@@ -85,11 +92,11 @@ void MindNode::updateSize()
 // ===== 边界矩形（Qt 要求）=====
 QRectF MindNode::boundingRect() const
 {
-    // 稍微大一点，留出阴影空间
     qreal shadow = 4;
+    qreal iconExtra = m_childNodes.isEmpty() ? 0 : 10;   // 🆕 图标预留空间
     return QRectF(-m_size.width() / 2 - shadow,
                   -m_size.height() / 2 - shadow,
-                  m_size.width() + shadow * 2,
+                  m_size.width() + shadow * 2 + iconExtra,
                   m_size.height() + shadow * 2);
 }
 
@@ -164,6 +171,29 @@ void MindNode::paint(QPainter *painter,
     painter->setFont(font);
     painter->setPen(m_textColor);
     painter->drawText(rect, Qt::AlignCenter, m_text);
+        // ===== 🆕 6. 绘制折叠图标（只在有子节点时）=====
+    if (!m_childNodes.isEmpty()) {
+        // 图标位置：节点右侧
+        qreal iconSize = 14;
+        qreal iconX = m_size.width() / 2 - 4;
+        qreal iconY = -iconSize / 2;
+        QRectF iconRect(iconX, iconY, iconSize, iconSize);
+
+        // 图标背景（白色圆）
+        painter->setPen(QPen(m_borderColor, 1));
+        painter->setBrush(QColor("#FFFFFF"));
+        painter->drawEllipse(iconRect);
+
+        // 图标符号
+        painter->setPen(QPen(m_borderColor, 2));
+        QFont iconFont;
+        iconFont.setPixelSize(10);
+        iconFont.setBold(true);
+        painter->setFont(iconFont);
+
+        QString icon = m_collapsed ? "+" : "-";
+        painter->drawText(iconRect, Qt::AlignCenter, icon);
+    }
 }
 
 // ===== 悬停事件 =====
@@ -289,7 +319,8 @@ void MindNode::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 
     // ✏️ 编辑文字
     QAction *editAct = menu.addAction(QObject::tr("✏️ 编辑文字"));
-
+        // 🆕 AI 展开
+    QAction *aiExpandAct = menu.addAction(QObject::tr("🤖 AI 展开这个话题"));
     menu.addSeparator();
 
     // 🎨 修改颜色
@@ -316,26 +347,30 @@ void MindNode::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
     }
 
     // ===== 处理选择 =====
-    if (chosen == addChildAct) {
-        // 创建子节点
-        MindNode *child = new MindNode(QObject::tr("新节点"));
-        child->m_parentNode = this;
-        m_childNodes.append(child);
+        if (chosen == addChildAct) {
+        if (!scene()) { event->accept(); return; }
 
-        if (scene()) {
-            scene()->addItem(child);
+        // 计算子节点位置
+        int childCount = m_childNodes.size() + 1;
+        qreal offsetX = 200;
+        qreal offsetY = (childCount - 1) * 80 - (childCount / 2) * 40;
+        QPointF newPos(pos().x() + offsetX, pos().y() + offsetY);
 
-            // 位置：父节点右边
-            int childCount = m_childNodes.size();
-            qreal offsetX = 200;
-            qreal offsetY = (childCount - 1) * 80 - (m_childNodes.size() - 1) * 40;
-            child->setPos(pos().x() + offsetX, pos().y() + offsetY);
+        // 生成新 ID（用时间戳保证唯一）
+        QString newId = QString("node_%1").arg(QDateTime::currentMSecsSinceEpoch());
 
-            // 创建连线
-            MindEdge *edge = new MindEdge(this, child);
-            addEdge(edge);
-            child->addEdge(edge);
-            scene()->addItem(edge);
+        // 用命令模式添加
+        QList<QGraphicsView*> views = scene()->views();
+        MindMapView *view = nullptr;
+        for (auto *v : views) {
+            view = qobject_cast<MindMapView*>(v);
+            if (view) break;
+        }
+
+        if (view) {
+            AddNodeCommand *cmd = new AddNodeCommand(
+                scene(), this, QObject::tr("新节点"), newPos, newId);
+            view->undoStack()->push(cmd);
         }
     }
     else if (chosen == editAct) {
@@ -375,9 +410,33 @@ void MindNode::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
     else if (chosen == sharpRectShapeAct) {
         setNodeShape(NodeShape::Rect);
     }
-    else if (chosen == deleteAct) {
-        // 🆕 删除节点（连同所有子孙）
-        deleteWithChildren();
+        else if (chosen == deleteAct) {
+        // 用命令模式删除
+        QList<QGraphicsView*> views = scene() ? scene()->views() : QList<QGraphicsView*>();
+        MindMapView *view = nullptr;
+        for (auto *v : views) {
+            view = qobject_cast<MindMapView*>(v);
+            if (view) break;
+        }
+
+        if (view) {
+            DeleteNodeCommand *cmd = new DeleteNodeCommand(scene(), this);
+            view->undoStack()->push(cmd);
+        } else {
+            // 备用方案：直接删除
+            deleteWithChildren();
+        }
+    }        else if (chosen == aiExpandAct) {
+        if (scene()) {
+            QList<QGraphicsView*> views = scene()->views();
+            for (auto *v : views) {
+                MindMapView *mv = qobject_cast<MindMapView*>(v);
+                if (mv) {
+                    mv->requestAiExpandForNode(this);
+                    break;
+                }
+            }
+        }
     }
 
     event->accept();
@@ -449,4 +508,172 @@ void MindNode::deleteWithChildren()
 
     // 第 5 步：删除自己
     delete this;
+}
+
+// ===== 🆕 记录拖动起始位置 =====
+void MindNode::mousePressEvent(QGraphicsSceneMouseEvent *event)
+{
+    // 🆕 先检测是否点击了折叠图标
+    if (event->button() == Qt::LeftButton && !m_childNodes.isEmpty()) {
+        if (isPointOnFoldIcon(event->pos())) {
+            toggleCollapsed();
+            event->accept();
+            return;
+        }
+    }
+
+    // 记录拖动起始位置
+    if (event->button() == Qt::LeftButton && !m_isCenterNode) {
+        m_dragStartPos = pos();
+        m_isDragging = true;
+    }
+    QGraphicsItem::mousePressEvent(event);
+}
+
+// ===== 🆕 拖动结束，生成移动命令 =====
+void MindNode::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton && m_isDragging && !m_isCenterNode) {
+        m_isDragging = false;
+        QPointF newPos = pos();
+
+        // 如果位置有变化，生成命令
+        if (newPos != m_dragStartPos && scene()) {
+            QList<QGraphicsView*> views = scene()->views();
+            for (auto *v : views) {
+                MindMapView *mv = qobject_cast<MindMapView*>(v);
+                if (mv) {
+                    // 先把节点位置改回起点，再通过命令移回来（保证撤销时能回去）
+                    // 但已经在 newPos 了，命令的 redo 是设为 newPos
+                    // undo 是设回 m_dragStartPos
+                    // 所以直接推命令
+                    MoveNodeCommand *cmd = new MoveNodeCommand(
+                        this, m_dragStartPos, newPos);
+                    // 不调用 redo（因为节点已经在 newPos）
+                    // 用 setSkipRedo 的技巧不好，我们让 redo 幂等
+                    mv->undoStack()->push(cmd);
+                    break;
+                }
+            }
+        }
+    }
+    QGraphicsItem::mouseReleaseEvent(event);
+}
+
+// ============================================================
+// 🆕 折叠/展开
+// ============================================================
+bool MindNode::isPointOnFoldIcon(const QPointF &localPos) const
+{
+    if (m_childNodes.isEmpty()) return false;
+
+    qreal iconSize = 14;
+    qreal iconX = m_size.width() / 2 - 4;
+    qreal iconY = -iconSize / 2;
+    QRectF iconRect(iconX, iconY, iconSize, iconSize);
+
+    return iconRect.contains(localPos);
+}
+
+void MindNode::setCollapsed(bool collapsed)
+{
+    if (m_collapsed == collapsed) return;
+    m_collapsed = collapsed;
+    setChildrenVisible(!collapsed);
+    update();
+}
+
+void MindNode::toggleCollapsed()
+{
+    setCollapsed(!m_collapsed);
+}
+
+// 递归显示/隐藏所有子孙节点 + 连线
+void MindNode::setChildrenVisible(bool visible)
+{
+    for (MindNode *child : m_childNodes) {
+        if (!child) continue;
+
+        child->setVisible(visible);
+
+        // 隐藏连接父子的连线
+        for (MindEdge *edge : m_edges) {
+            if (edge && edge->destNode() == child) {
+                edge->setVisible(visible);
+            }
+        }
+
+        // 递归处理子孙
+        if (visible && !child->m_collapsed) {
+            // 展开时：如果子节点自己没被折叠，展开它的子孙
+            child->setChildrenVisible(true);
+        } else if (!visible) {
+            // 折叠时：无条件隐藏所有子孙
+            child->setChildrenVisible(false);
+        }
+    }
+}
+
+// ============================================================
+// 🆕 快速添加节点（供快捷键使用）
+// ============================================================
+
+// 添加子节点
+MindNode *MindNode::addChildNode(const QString &text)
+{
+    if (!scene()) return nullptr;
+
+    // 计算新节点位置
+    int childCount = m_childNodes.size() + 1;
+    qreal offsetX = 200;
+    qreal offsetY = (childCount - 1) * 80 - (childCount / 2) * 40;
+    QPointF newPos(pos().x() + offsetX, pos().y() + offsetY);
+
+    // 生成 ID
+    QString newId = QString("node_%1").arg(QDateTime::currentMSecsSinceEpoch());
+
+    // 通过 MindMapView 的 UndoStack 添加
+    QList<QGraphicsView*> views = scene()->views();
+    MindMapView *view = nullptr;
+    for (auto *v : views) {
+        view = qobject_cast<MindMapView*>(v);
+        if (view) break;
+    }
+
+    QString nodeText = text.isEmpty() ? QObject::tr("新节点") : text;
+
+    if (view) {
+        AddNodeCommand *cmd = new AddNodeCommand(
+            scene(), this, nodeText, newPos, newId);
+        view->undoStack()->push(cmd);
+        return cmd->createdNode();
+    }
+
+    return nullptr;
+}
+
+// 添加同级节点（兄弟）
+MindNode *MindNode::addSiblingNode(const QString &text)
+{
+    // 中心节点没有兄弟
+    if (m_isCenterNode || !m_parentNode) return nullptr;
+
+    return m_parentNode->addChildNode(text);
+}
+
+// 触发编辑
+void MindNode::startEdit()
+{
+    bool ok;
+    QString newText = QInputDialog::getText(
+        nullptr,
+        QObject::tr("编辑节点"),
+        QObject::tr("节点文字:"),
+        QLineEdit::Normal,
+        m_text,
+        &ok);
+
+    if (ok && !newText.trimmed().isEmpty()) {
+        setText(newText.trimmed());
+    }
 }

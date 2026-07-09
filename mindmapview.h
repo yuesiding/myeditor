@@ -8,6 +8,7 @@ class QWheelEvent;
 class QMouseEvent;
 class QKeyEvent;
 class MindNode;
+class QUndoStack;
 
 class MindMapView : public QGraphicsView
 {
@@ -35,7 +36,14 @@ public:
 
     // 🆕 关闭前询问保存（返回 true 表示可以继续）
     bool maybeSave();
-
+        // 🆕 撤销/重做
+    QUndoStack *undoStack() const { return m_undoStack; }
+    void undo();
+    void redo();
+        // 🆕 导出为图片
+    bool exportToImage(const QString &filePath);
+        // 🆕 供节点调用
+    void requestAiExpandForNode(MindNode *node);
 signals:
     // 🆕 文件信息变化（通知 MainWindow 更新标题）
     void fileInfoChanged();
@@ -48,7 +56,10 @@ protected:
 
     // 🆕 双击画布空白 → 创建自由节点
     void mouseDoubleClickEvent(QMouseEvent *event) override;
-
+        // 🆕 右键菜单（空白处）
+    void contextMenuEvent(QContextMenuEvent *event) override;
+        // 🆕 让 Tab 键传给 keyPressEvent（否则 Tab 会被吃掉切换焦点）
+    bool focusNextPrevChild(bool next) override;
 private:
     void scaleView(qreal factor);
 
@@ -68,6 +79,11 @@ private:
 
     static constexpr qreal MIN_SCALE = 0.1;
     static constexpr qreal MAX_SCALE = 5.0;
+        // 🆕 撤销栈
+    QUndoStack *m_undoStack;
+
+private slots:
+    void applyTheme();// 🆕 应用主题
 };
 
 #endif // MINDMAPVIEW_H

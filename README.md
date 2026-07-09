@@ -11,7 +11,7 @@
 ![CMake](https://img.shields.io/badge/CMake-3.16+-064F8C?logo=cmake&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-![Version](https://img.shields.io/badge/Version-3.0.0-brightgreen)
+![Version](https://img.shields.io/badge/Version-4.0.0-brightgreen)
 </div>
 
 ---
@@ -74,6 +74,18 @@
 - ⚡ **命令面板**：Ctrl+Shift+P 快速执行所有命令
 - 🗺️ **迷你地图**：右侧代码缩略图
 - 🌗 **亮/暗主题**：一键切换
+
+### 🧠 思维导图（v4.0 新增！）
+
+- 🎨 **可视化画布** — 无限画布，滚轮缩放，中键拖动
+- 🎯 **节点系统** — 中心主题 + 子节点，贝塞尔曲线连接
+- ⌨️ **快捷操作** — Tab 添加子节点，Enter 添加同级
+- ✨ **AI 联动** — 选中节点，AI 自动生成子话题！
+- 🎨 **样式定制** — 颜色、形状、可折叠子分支
+- 💾 **完整持久化** — 保存为 .qmind (JSON) 文件
+- 🖼️ **导出 PNG** — 一键导出为高清图片
+- ↶ **撤销重做** — 完整的命令模式
+- 🌗 **主题适配** — 亮/暗主题下都好看
 
 ### 🔧 可扩展性
 
@@ -228,6 +240,17 @@ myeditor/
 | `F5` | 运行当前文件 |
 | `Shift + F5` | 停止运行 |
 | `` Ctrl + ` `` | 显示/隐藏终端 |
+### 🧠 思维导图模式
+
+| `Tab` | 添加子节点 |
+| `Enter` | 添加同级节点 |
+| `Delete` | 删除选中节点 |
+| `F2` | 编辑节点 |
+| `Ctrl+A` | 全选 |
+| `Ctrl+Z` | 撤销 |
+| `Ctrl+Y` | 重做 |
+| `+` / `-` | 缩放 |
+| `0` | 重置视图 |
 ---
 
 ## 📄 License

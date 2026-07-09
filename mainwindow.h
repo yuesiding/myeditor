@@ -93,6 +93,10 @@ private slots:
 
     // 🆕 更新窗口标题（根据当前模式和文件）
     void updateWindowTitleForMindMap();
+        // 🆕 思维导图的撤销/重做
+    void mindMapUndo();
+    void mindMapRedo();
+    void exportMindMapImage();
 private:
     void createMenus();
     EditorWidget *createEditor();
@@ -150,6 +154,10 @@ private:
     QToolBar *m_modeToolBar; // 🆕 模式切换工具栏
     QAction *m_editorModeAction;
     QAction *m_mindMapModeAction;
+public slots:
+    // 🆕 供思维导图节点调用（用 QMetaObject::invokeMethod）
+    public slots:
+    void requestAiExpandFromNode(QVariant nodePtr);
 };
 
 #endif // MAINWINDOW_H

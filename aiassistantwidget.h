@@ -26,7 +26,15 @@ public:
 
     // 从外部提问（比如右键菜单调用）
     void askQuestion(const QString &question);
+        // 🆕 AI 生成话题建议（供思维导图使用）
+    // 返回一个 signal 会异步发出结果
+    void requestTopicSuggestions(const QString &parentTopic,
+                                  const QStringList &existingChildren);
 
+signals:
+    // 🆕 话题建议返回
+    void topicSuggestionsReady(const QStringList &topics);
+    void topicSuggestionsError(const QString &error);
 private slots:
     void onSendClicked();
     void onClearClicked();
@@ -67,6 +75,9 @@ private:
     bool m_waitingForReply;            // 是否在等待响应
         // 🆕 简单的 Markdown -> HTML 转换
     QString markdownToHtml(const QString &markdown) const;
+        // 🆕 是否正在请求话题建议（不显示在聊天历史里）
+    bool m_isRequestingTopics;
+    QString m_topicParent;
 };
 
 #endif // AIASSISTANTWIDGET_H

@@ -68,6 +68,19 @@ public:
         // 🆕 唯一 ID（用于保存/加载）
     QString nodeId() const { return m_nodeId; }
     void setNodeId(const QString &id) { m_nodeId = id; }
+        // 🆕 折叠/展开
+    bool isCollapsed() const { return m_collapsed; }
+    void setCollapsed(bool collapsed);
+    void toggleCollapsed();
+
+    // 🆕 判断某个位置是否在折叠图标上
+    bool isPointOnFoldIcon(const QPointF &localPos) const;
+        // 🆕 快速添加子节点/兄弟节点（供快捷键使用）
+    MindNode *addChildNode(const QString &text = QString());
+    MindNode *addSiblingNode(const QString &text = QString());
+
+    // 🆕 触发编辑（弹出输入框）
+    void startEdit();
 protected:
     // ===== 悬停事件 =====
     void hoverEnterEvent(QGraphicsSceneHoverEvent *event) override;
@@ -79,6 +92,8 @@ protected:
     void contextMenuEvent(QGraphicsSceneContextMenuEvent *event) override;
             // 🆕 双击编辑
     void mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event) override;
+        void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
+    void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
 private:
     // 根据文字计算节点大小
     void updateSize();
@@ -100,6 +115,14 @@ private:
     QVector<MindEdge*> m_edges;// 🆕 连接到本节点的所有连线（用于位置变化时通知它们）
             
     QString m_nodeId;// 🆕 节点唯一 ID
+        // 🆕 记录拖动开始时的位置（用于生成撤销命令）
+    QPointF m_dragStartPos;
+    bool m_isDragging;
+        // 🆕 折叠状态
+    bool m_collapsed;
+
+    // 🆕 递归显示/隐藏子孙节点
+    void setChildrenVisible(bool visible);
 };
 
 #endif // MINDNODE_H

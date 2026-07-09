@@ -54,6 +54,10 @@ add_executable(CodeEditor
     mindnode.h  
     mindedge.cpp        
     mindedge.h
+    mindmapcommands.cpp   
+    mindmapcommands.h
+    mindmapaidialog.cpp    
+    mindmapaidialog.h
 )
 
 target_link_libraries(CodeEditor PRIVATE Qt5::Widgets Qt5::Network)

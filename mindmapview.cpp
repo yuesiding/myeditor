@@ -16,12 +16,19 @@
 #include <QInputDialog>
 #include <QHash>
 #include <QTimer>
+#include <QUndoStack>
+#include <QPixmap>
+#include <QContextMenuEvent>
+#include <QMenu>
+#include "mindmapcommands.h"
+#include "thememanager.h"
 
 MindMapView::MindMapView(QWidget *parent)
     : QGraphicsView(parent)
     , m_currentScale(1.0)
     , m_modified(false)
     , m_nextNodeId(0)
+    , m_undoStack(new QUndoStack(this))
 {
     m_scene = new QGraphicsScene(this);
     m_scene->setSceneRect(-5000, -5000, 10000, 10000);
@@ -45,6 +52,10 @@ MindMapView::MindMapView(QWidget *parent)
     setFocusPolicy(Qt::StrongFocus);
     centerOn(0, 0);
 
+        // 🆕 监听主题变化
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged,
+            this, &MindMapView::applyTheme);
+    applyTheme();
     // 🆕 创建默认思维导图
     createDefaultMindMap();
         // 🆕 延迟连接场景变化信号（避免初始化时被触发）
@@ -144,43 +155,114 @@ void MindMapView::keyPressEvent(QKeyEvent *event)
             event->accept();
             return;
 
-        // 🆕 Delete 键：删除选中的节点
+        // Delete 键：删除选中的节点
         case Qt::Key_Delete: {
             QList<QGraphicsItem*> selected = m_scene->selectedItems();
+            QVector<MindNode*> toDelete;
             for (QGraphicsItem *item : selected) {
                 MindNode *node = dynamic_cast<MindNode*>(item);
                 if (node && !node->isCenterNode()) {
-                    node->deleteWithChildren();
+                    toDelete.append(node);
+                }
+            }
+            for (MindNode *node : toDelete) {
+                DeleteNodeCommand *cmd = new DeleteNodeCommand(m_scene, node);
+                m_undoStack->push(cmd);
+            }
+            event->accept();
+            return;
+        }
+
+        // F2 键：编辑选中的节点
+        case Qt::Key_F2: {
+            QList<QGraphicsItem*> selected = m_scene->selectedItems();
+            if (!selected.isEmpty()) {
+                MindNode *node = dynamic_cast<MindNode*>(selected.first());
+                if (node) {
+                    node->startEdit();
                 }
             }
             event->accept();
             return;
         }
 
-        // 🆕 F2 键：编辑选中的节点
-        case Qt::Key_F2: {
+        // 🆕 Tab 键：添加子节点
+        case Qt::Key_Tab: {
             QList<QGraphicsItem*> selected = m_scene->selectedItems();
-            if (!selected.isEmpty()) {
-                MindNode *node = dynamic_cast<MindNode*>(selected.first());
-                if (node) {
-                    // 触发双击一样的效果
-                    QGraphicsSceneMouseEvent fakeEvent(QEvent::GraphicsSceneMouseDoubleClick);
-                    // 直接调用编辑
-                    bool ok;
-                    QString newText = QInputDialog::getText(
-                        this,
-                        tr("编辑节点"),
-                        tr("节点文字:"),
-                        QLineEdit::Normal,
-                        node->text(),
-                        &ok);
-                    if (ok && !newText.trimmed().isEmpty()) {
-                        node->setText(newText.trimmed());
+            MindNode *parentNode = nullptr;
+
+            if (selected.isEmpty()) {
+                // 没有选中：找中心节点
+                for (QGraphicsItem *item : m_scene->items()) {
+                    MindNode *n = dynamic_cast<MindNode*>(item);
+                    if (n && n->isCenterNode()) {
+                        parentNode = n;
+                        break;
                     }
+                }
+            } else {
+                parentNode = dynamic_cast<MindNode*>(selected.first());
+            }
+
+            if (parentNode) {
+                MindNode *newNode = parentNode->addChildNode();
+                if (newNode) {
+                    // 选中新节点
+                    m_scene->clearSelection();
+                    newNode->setSelected(true);
+                    // 立刻编辑
+                    newNode->startEdit();
                 }
             }
             event->accept();
             return;
+        }
+
+        // 🆕 Enter 键：添加同级节点
+        case Qt::Key_Return:
+        case Qt::Key_Enter: {
+            QList<QGraphicsItem*> selected = m_scene->selectedItems();
+            if (selected.isEmpty()) {
+                event->accept();
+                return;
+            }
+
+            MindNode *currentNode = dynamic_cast<MindNode*>(selected.first());
+            if (!currentNode) {
+                event->accept();
+                return;
+            }
+
+            MindNode *newNode = nullptr;
+            if (currentNode->isCenterNode()) {
+                // 中心节点：加子节点
+                newNode = currentNode->addChildNode();
+            } else {
+                // 普通节点：加兄弟
+                newNode = currentNode->addSiblingNode();
+            }
+
+            if (newNode) {
+                m_scene->clearSelection();
+                newNode->setSelected(true);
+                newNode->startEdit();
+            }
+            event->accept();
+            return;
+        }
+
+        // 🆕 Ctrl+A：全选
+        case Qt::Key_A: {
+            if (event->modifiers() & Qt::ControlModifier) {
+                for (QGraphicsItem *item : m_scene->items()) {
+                    if (dynamic_cast<MindNode*>(item)) {
+                        item->setSelected(true);
+                    }
+                }
+                event->accept();
+                return;
+            }
+            break;
         }
     }
 
@@ -259,6 +341,7 @@ void MindMapView::createDefaultMindMap()
 
     m_modified = false;
     m_currentFile.clear();
+    if (m_undoStack) m_undoStack->clear();
     emit fileInfoChanged();
 }
 
@@ -464,6 +547,7 @@ bool MindMapView::loadFromFile(const QString &filePath)
     setCurrentFile(filePath);
     setModified(false);
     zoomToFit();
+        if (m_undoStack) m_undoStack->clear();
     return true;
 }
 
@@ -482,4 +566,149 @@ void MindMapView::mouseDoubleClickEvent(QMouseEvent *event)
     // 提示用户用右键
     // 可以在这里加提示，但暂时留空
     QGraphicsView::mouseDoubleClickEvent(event);
+}
+
+// ============================================================
+// 🆕 撤销/重做
+// ============================================================
+void MindMapView::undo()
+{
+    if (m_undoStack->canUndo()) {
+        m_undoStack->undo();
+    }
+}
+
+void MindMapView::redo()
+{
+    if (m_undoStack->canRedo()) {
+        m_undoStack->redo();
+    }
+}
+
+// ============================================================
+// 🆕 导出为图片
+// ============================================================
+bool MindMapView::exportToImage(const QString &filePath)
+{
+    if (!m_scene) return false;
+
+    // 计算所有节点的包围盒
+    QRectF sceneRect = m_scene->itemsBoundingRect();
+    if (sceneRect.isEmpty()) {
+        return false;
+    }
+
+    // 加一些边距
+    sceneRect.adjust(-30, -30, 30, 30);
+
+    // 创建高清图片（2x 分辨率）
+    qreal ratio = 2.0;
+    int w = static_cast<int>(sceneRect.width() * ratio);
+    int h = static_cast<int>(sceneRect.height() * ratio);
+
+    QPixmap pixmap(w, h);
+    pixmap.fill(Qt::white);   // 白色背景
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform);
+    painter.setRenderHint(QPainter::TextAntialiasing);
+
+    // 缩放画布匹配图片
+    painter.scale(ratio, ratio);
+
+    // 让场景绘制到我们的 painter
+    m_scene->render(&painter, QRectF(0, 0, sceneRect.width(), sceneRect.height()),
+                    sceneRect);
+    painter.end();
+
+    // 保存
+    return pixmap.save(filePath, "PNG");
+}
+// ============================================================
+// 🆕 应用主题
+// ============================================================
+void MindMapView::applyTheme()
+{
+    const Theme &theme = ThemeManager::instance().currentTheme();
+    bool isDark = theme.editorBackground.lightness() < 128;
+
+    // 画布背景色
+    QColor bgColor;
+    if (isDark) {
+        bgColor = QColor("#1E1E1E");   // 深色背景
+    } else {
+        bgColor = QColor("#F5F5F5");   // 浅灰背景
+    }
+    setBackgroundBrush(bgColor);
+
+    // 触发所有节点重绘（它们会读主题色）
+    if (m_scene) {
+        for (QGraphicsItem *item : m_scene->items()) {
+            item->update();
+        }
+    }
+}
+
+// ============================================================
+// 🆕 右键菜单（空白处）
+// ============================================================
+void MindMapView::contextMenuEvent(QContextMenuEvent *event)
+{
+    // 如果右键在节点上，让节点处理
+    QGraphicsItem *item = itemAt(event->pos());
+    if (item) {
+        QGraphicsView::contextMenuEvent(event);
+        return;
+    }
+
+    // 右键空白处：显示画布菜单
+    QMenu menu(this);
+
+    QAction *newAct = menu.addAction(tr("🧠 新建思维导图"));
+    QAction *fitAct = menu.addAction(tr("🎯 适应窗口"));
+    QAction *resetAct = menu.addAction(tr("↩ 重置视图"));
+
+    menu.addSeparator();
+
+    QAction *undoAct = menu.addAction(tr("↶ 撤销"));
+    undoAct->setEnabled(m_undoStack && m_undoStack->canUndo());
+
+    QAction *redoAct = menu.addAction(tr("↷ 重做"));
+    redoAct->setEnabled(m_undoStack && m_undoStack->canRedo());
+
+    QAction *chosen = menu.exec(event->globalPos());
+
+    if (chosen == newAct) {
+        newMindMap();
+    } else if (chosen == fitAct) {
+        zoomToFit();
+    } else if (chosen == resetAct) {
+        resetView();
+    } else if (chosen == undoAct) {
+        undo();
+    } else if (chosen == redoAct) {
+        redo();
+    }
+}
+
+// ===== 🆕 阻止 Tab 键切换焦点 =====
+bool MindMapView::focusNextPrevChild(bool next)
+{
+    Q_UNUSED(next);
+    return false;   // 让 Tab 键交给 keyPressEvent 处理
+}
+
+// ===== 🆕 触发 AI 展开节点（供 MindNode 调用）=====
+void MindMapView::requestAiExpandForNode(MindNode *node)
+{
+    if (!node) return;
+
+    // 通过 window() 找 MainWindow，调用它的方法
+    QWidget *w = window();
+    if (w) {
+        // 用属性传递指针
+        QMetaObject::invokeMethod(w, "requestAiExpandFromNode",
+            Q_ARG(QVariant, QVariant::fromValue(reinterpret_cast<quintptr>(node))));
+    }
 }

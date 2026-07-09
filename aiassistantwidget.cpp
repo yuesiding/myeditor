@@ -23,6 +23,7 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
     : QWidget(parent)
     , m_networkManager(new QNetworkAccessManager(this))
     , m_waitingForReply(false)
+    , m_isRequestingTopics(false)
 {
     setupUi();
 
@@ -595,4 +596,142 @@ QString AiAssistantWidget::markdownToHtml(const QString &markdown) const
     }
 
     return html;
+}
+
+// ============================================================
+// 🆕 请求话题建议（专门给思维导图用）
+// ============================================================
+void AiAssistantWidget::requestTopicSuggestions(const QString &parentTopic,
+                                                 const QStringList &existingChildren)
+{
+    if (!hasApiKey()) {
+        emit topicSuggestionsError(tr("请先设置 API Key"));
+        return;
+    }
+
+    m_isRequestingTopics = true;
+    m_topicParent = parentTopic;
+
+    // 构造 prompt
+    QString existingText;
+    if (!existingChildren.isEmpty()) {
+        existingText = tr("\n\n已有的子话题（请不要重复）：\n");
+        for (const QString &child : existingChildren) {
+            existingText += QString("- %1\n").arg(child);
+        }
+    }
+
+    QString prompt = tr(
+        "我在做一个思维导图，父话题是「%1」。%2\n"
+        "请为它生成 5-8 个相关的子话题，帮我扩展思路。\n\n"
+        "要求：\n"
+        "1. 每个话题简短（2-6 个字），适合作为思维导图节点\n"
+        "2. 话题之间有区分度，覆盖不同维度\n"
+        "3. 直接列出话题，不要多余解释\n"
+        "4. 严格使用以下格式，每行一个话题，前面加短横线：\n"
+        "- 话题1\n"
+        "- 话题2\n"
+        "- 话题3\n"
+    ).arg(parentTopic, existingText);
+
+    // 构造请求
+    QUrl url("https://api.deepseek.com/v1/chat/completions");
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setRawHeader("Authorization", ("Bearer " + apiKey()).toUtf8());
+
+    QJsonObject body;
+    body["model"] = "deepseek-chat";
+    body["temperature"] = 0.9;   // 高一点，有创意
+    body["stream"] = false;
+
+    QJsonArray messages;
+
+    QJsonObject systemMsg;
+    systemMsg["role"] = "system";
+    systemMsg["content"] = "你是一个思维导图助手。你的任务是为用户的话题生成相关子话题。"
+                          "请严格按照用户要求的格式返回。";
+    messages.append(systemMsg);
+
+    QJsonObject userMsg;
+    userMsg["role"] = "user";
+    userMsg["content"] = prompt;
+    messages.append(userMsg);
+
+    body["messages"] = messages;
+
+    QJsonDocument doc(body);
+    QByteArray data = doc.toJson();
+
+    // 用独立的 QNetworkAccessManager 请求（避免和聊天冲突）
+    QNetworkAccessManager *tempManager = new QNetworkAccessManager(this);
+    QNetworkReply *reply = tempManager->post(request, data);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, tempManager]() {
+        m_isRequestingTopics = false;
+
+        if (reply->error() != QNetworkReply::NoError) {
+            emit topicSuggestionsError(tr("网络错误: %1").arg(reply->errorString()));
+            reply->deleteLater();
+            tempManager->deleteLater();
+            return;
+        }
+
+        QByteArray data = reply->readAll();
+        reply->deleteLater();
+        tempManager->deleteLater();
+
+        QJsonParseError parseError;
+        QJsonDocument doc = QJsonDocument::fromJson(data, &parseError);
+        if (parseError.error != QJsonParseError::NoError) {
+            emit topicSuggestionsError(tr("解析响应失败"));
+            return;
+        }
+
+        QJsonObject root = doc.object();
+
+        if (root.contains("error")) {
+            QJsonObject err = root["error"].toObject();
+            emit topicSuggestionsError(err["message"].toString());
+            return;
+        }
+
+        QJsonArray choices = root["choices"].toArray();
+        if (choices.isEmpty()) {
+            emit topicSuggestionsError(tr("AI 未返回内容"));
+            return;
+        }
+
+        QString content = choices[0].toObject()["message"].toObject()["content"].toString();
+
+        // 解析话题列表（每行一个，前面有 - 或 * 或数字）
+        QStringList topics;
+        QStringList lines = content.split('\n');
+        for (const QString &line : lines) {
+            QString trimmed = line.trimmed();
+            if (trimmed.isEmpty()) continue;
+
+            // 去掉开头的标记
+            QString topic = trimmed;
+            if (topic.startsWith("- ")) topic = topic.mid(2);
+            else if (topic.startsWith("* ")) topic = topic.mid(2);
+            else if (topic.startsWith("• ")) topic = topic.mid(2);
+            else {
+                // 尝试匹配数字开头（如 "1. xxx"）
+                int dotPos = topic.indexOf(". ");
+                if (dotPos > 0 && dotPos < 4) {
+                    bool isNum;
+                    topic.left(dotPos).toInt(&isNum);
+                    if (isNum) topic = topic.mid(dotPos + 2);
+                }
+            }
+
+            topic = topic.trimmed();
+            if (!topic.isEmpty() && topic.length() < 30) {   // 过滤太长的
+                topics.append(topic);
+            }
+        }
+
+        emit topicSuggestionsReady(topics);
+    });
 }

@@ -1,6 +1,6 @@
 #include "mindedge.h"
 #include "mindnode.h"
-
+#include "thememanager.h"
 #include <QPainter>
 #include <QPainterPath>
 #include <QStyleOptionGraphicsItem>
@@ -61,8 +61,13 @@ void MindEdge::paint(QPainter *painter,
 
     painter->setRenderHint(QPainter::Antialiasing);
 
+    // 🆕 根据主题选择线条颜色
+    const Theme &theme = ThemeManager::instance().currentTheme();
+    bool isDark = theme.editorBackground.lightness() < 128;
+    QColor lineColor = isDark ? QColor("#7F8C8D").lighter(130) : m_lineColor;
+
     // 画笔
-    QPen pen(m_lineColor, m_lineWidth, Qt::SolidLine,
+    QPen pen(lineColor, m_lineWidth, Qt::SolidLine,
              Qt::RoundCap, Qt::RoundJoin);
     painter->setPen(pen);
     painter->setBrush(Qt::NoBrush);
