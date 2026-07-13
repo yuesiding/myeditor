@@ -11,7 +11,6 @@ class QKeyEvent;
 class LineNumberArea;
 class QWheelEvent;
 class LineNumberArea;
-class MinimapWidget;
 class QContextMenuEvent;
 
 struct FoldRegion {
@@ -59,7 +58,7 @@ public:
     void unfoldAll();
 
     int foldedCount() const;// 🆕 当前已折叠数量
-    int minimapWidth() const;// 🆕 迷你地图相关
+
 signals:
     void fileInfoChanged();
         // 🆕 折叠数量变化（用于状态栏显示）
@@ -102,8 +101,6 @@ private:
     // 找出某行开始的折叠区域索引（找不到返回 -1）
     int findFoldRegionByStartLine(int line) const;
         
-    MinimapWidget *m_minimap;// 🆕 迷你地图
-    bool m_showMinimap;   // 是否显示
 };
 
 

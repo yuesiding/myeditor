@@ -1,6 +1,5 @@
 #include "aiassistantwidget.h"
 #include "thememanager.h"
-
 #include <QTextEdit>
 #include <QLineEdit>
 #include <QPushButton>
@@ -17,13 +16,11 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QKeyEvent>
-#include <QRegularExpression>
 
 AiAssistantWidget::AiAssistantWidget(QWidget *parent)
     : QWidget(parent)
     , m_networkManager(new QNetworkAccessManager(this))
     , m_waitingForReply(false)
-    , m_isRequestingTopics(false)
 {
     setupUi();
 
@@ -41,38 +38,38 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
 
 void AiAssistantWidget::setupUi()
 {
-    // ===== 标题 =====
-    QLabel *titleLabel = new QLabel(tr("🤖 AI 助手 (DeepSeek)"), this);
+    //标题 
+    QLabel *titleLabel = new QLabel(tr("🤖AI助手"), this);
     titleLabel->setStyleSheet(
         "QLabel { padding: 6px; font-weight: bold; font-size: 13px; }"
     );
 
-    // ===== 状态提示 =====
+    //状态提示
     m_statusLabel = new QLabel(this);
     m_statusLabel->setStyleSheet(
         "QLabel { padding: 4px 6px; color: #888; font-size: 11px; }"
     );
     m_statusLabel->setText(tr("准备就绪"));
 
-    // ===== 设置 API Key 按钮 =====
-    m_configKeyButton = new QPushButton(tr("🔑 设置 API Key"), this);
+    //设置API Key
+    m_configKeyButton = new QPushButton(tr("🔑 Set API Key"), this);
     connect(m_configKeyButton, &QPushButton::clicked,
             this, &AiAssistantWidget::onConfigKeyClicked);
 
-    // ===== 对话显示区 =====
+    //对话显示
     m_chatDisplay = new QTextEdit(this);
     m_chatDisplay->setReadOnly(true);
     m_chatDisplay->setPlaceholderText(tr("对话历史将显示在这里..."));
 
-    // ===== 输入区 =====
+    //输入
     m_inputField = new QTextEdit(this);
     m_inputField->setPlaceholderText(tr("输入问题... (Ctrl+Enter 发送)"));
     m_inputField->setMaximumHeight(100);
 
-    // 拦截 Ctrl+Enter
+    //拦截 Ctrl+Enter
     m_inputField->installEventFilter(this);
 
-    // ===== 按钮 =====
+    //按键
     m_sendButton = new QPushButton(tr("📤 发送"), this);
     connect(m_sendButton, &QPushButton::clicked,
             this, &AiAssistantWidget::onSendClicked);
@@ -81,7 +78,7 @@ void AiAssistantWidget::setupUi()
     connect(m_clearButton, &QPushButton::clicked,
             this, &AiAssistantWidget::onClearClicked);
 
-    // ===== 布局 =====
+    //布局
     QHBoxLayout *buttonLayout = new QHBoxLayout;
     buttonLayout->addWidget(m_clearButton);
     buttonLayout->addStretch();
@@ -98,13 +95,13 @@ void AiAssistantWidget::setupUi()
 
     setLayout(mainLayout);
 
-    // 更新按钮显示（有 Key 就隐藏配置按钮变小）
+    //更新按钮显示
     if (hasApiKey()) {
         m_configKeyButton->setText(tr("🔑 更换 API Key"));
     }
 }
 
-// ===== 主题 =====
+    //主题 
 void AiAssistantWidget::applyTheme()
 {
     const Theme &theme = ThemeManager::instance().currentTheme();
@@ -128,7 +125,7 @@ void AiAssistantWidget::applyTheme()
     refreshChatDisplay();
 }
 
-// ===== 事件过滤（Ctrl+Enter 发送）=====
+//事件过滤
 bool AiAssistantWidget::eventFilter(QObject *obj, QEvent *event)
 {
     if (obj == m_inputField && event->type() == QEvent::KeyPress) {
@@ -142,7 +139,7 @@ bool AiAssistantWidget::eventFilter(QObject *obj, QEvent *event)
     return QWidget::eventFilter(obj, event);
 }
 
-// ===== API Key 管理 =====
+//API Key管理
 QString AiAssistantWidget::apiKey() const
 {
     QSettings settings("MyCompany", "CodeEditor");
@@ -160,7 +157,7 @@ bool AiAssistantWidget::hasApiKey() const
     return !apiKey().isEmpty();
 }
 
-// ===== 配置 API Key =====
+//配置API Key
 void AiAssistantWidget::onConfigKeyClicked()
 {
     QString currentKey = apiKey();
@@ -173,7 +170,7 @@ void AiAssistantWidget::onConfigKeyClicked()
     bool ok;
     QString newKey = QInputDialog::getText(
         this,
-        tr("配置 DeepSeek API Key"),
+        tr("配置API Key"),
         tr("请输入你的 API Key（以 sk- 开头）\n当前: %1")
             .arg(displayKey.isEmpty() ? tr("(未设置)") : displayKey),
         QLineEdit::Password,   // 隐藏显示
@@ -196,7 +193,7 @@ void AiAssistantWidget::onConfigKeyClicked()
     m_statusLabel->setText(tr("API Key 已配置 ✓"));
 }
 
-// ===== 发送 =====
+//发送
 void AiAssistantWidget::onSendClicked()
 {
     QString question = m_inputField->toPlainText().trimmed();
@@ -218,7 +215,7 @@ void AiAssistantWidget::onSendClicked()
     sendRequest(question);
 }
 
-// ===== 清空 =====
+//清空
 void AiAssistantWidget::onClearClicked()
 {
     auto ret = QMessageBox::question(
@@ -235,7 +232,7 @@ void AiAssistantWidget::onClearClicked()
     }
 }
 
-// ===== 从外部提问 =====
+//从外部提问
 void AiAssistantWidget::askQuestion(const QString &question)
 {
     if (!hasApiKey()) {
@@ -246,39 +243,39 @@ void AiAssistantWidget::askQuestion(const QString &question)
     sendRequest(question);
 }
 
-// ===== 发送 HTTP 请求 =====
+//发送HTTP请求
 void AiAssistantWidget::sendRequest(const QString &userMessage)
 {
-    // 添加用户消息到历史
+    //添加用户消息到历史
     appendMessage("user", userMessage);
 
     m_waitingForReply = true;
     m_sendButton->setEnabled(false);
     m_statusLabel->setText(tr("⏳ AI 思考中..."));
 
-    // 构造请求 URL
+    //构造请求 URL
     QUrl url("https://api.deepseek.com/v1/chat/completions");
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("Authorization", ("Bearer " + apiKey()).toUtf8());
 
-    // 构造请求 body
+    //构造请求body
     QJsonObject body;
     body["model"] = "deepseek-chat";
     body["temperature"] = 0.7;
     body["stream"] = false;
 
-    // 消息数组
+    //消息数组
     QJsonArray messages;
 
-    // 系统提示词
+    //系统提示词
     QJsonObject systemMsg;
     systemMsg["role"] = "system";
     systemMsg["content"] = "你是一个专业的编程助手，请用简洁清晰的中文回答用户的问题。"
                           "如果涉及代码，用 Markdown 代码块格式化。";
     messages.append(systemMsg);
 
-    // 添加历史对话（保留最近 10 条，避免超 token）
+    //添加历史对话
     int startIdx = qMax(0, m_messages.size() - 10);
     for (int i = startIdx; i < m_messages.size(); ++i) {
         QJsonObject msg;
@@ -292,11 +289,11 @@ void AiAssistantWidget::sendRequest(const QString &userMessage)
     QJsonDocument doc(body);
     QByteArray data = doc.toJson();
 
-    // 发送 POST 请求
+    //发送POST请求
     m_networkManager->post(request, data);
 }
 
-// ===== 收到响应 =====
+//收到响应
 void AiAssistantWidget::onNetworkReply(QNetworkReply *reply)
 {
     m_waitingForReply = false;
@@ -323,7 +320,7 @@ void AiAssistantWidget::onNetworkReply(QNetworkReply *reply)
 
     QJsonObject root = doc.object();
 
-    // 检查错误
+    //检查错误
     if (root.contains("error")) {
         QJsonObject err = root["error"].toObject();
         QString errMsg = err["message"].toString();
@@ -332,7 +329,7 @@ void AiAssistantWidget::onNetworkReply(QNetworkReply *reply)
         return;
     }
 
-    // 提取回复
+    //提取回复
     QJsonArray choices = root["choices"].toArray();
     if (choices.isEmpty()) {
         appendMessage("assistant", tr("API 未返回内容"));
@@ -344,7 +341,7 @@ void AiAssistantWidget::onNetworkReply(QNetworkReply *reply)
     QJsonObject message = firstChoice["message"].toObject();
     QString content = message["content"].toString();
 
-    // 显示 token 使用量
+    //显示token使用量
     QJsonObject usage = root["usage"].toObject();
     int totalTokens = usage["total_tokens"].toInt();
 
@@ -352,7 +349,7 @@ void AiAssistantWidget::onNetworkReply(QNetworkReply *reply)
     m_statusLabel->setText(tr("✓ 完成 (用 %1 tokens)").arg(totalTokens));
 }
 
-// ===== 添加消息 =====
+//添加消息
 void AiAssistantWidget::appendMessage(const QString &role, const QString &content)
 {
     ChatMessage msg;
@@ -363,7 +360,7 @@ void AiAssistantWidget::appendMessage(const QString &role, const QString &conten
     refreshChatDisplay();
 }
 
-// ===== 刷新聊天显示 =====
+// 刷新聊天
 void AiAssistantWidget::refreshChatDisplay()
 {
     const Theme &theme = ThemeManager::instance().currentTheme();
@@ -376,21 +373,15 @@ void AiAssistantWidget::refreshChatDisplay()
     QString hrColor = isDark ? "#3F3F3F" : "#DDD";
 
     QString html;
-        html += QString("<style>"
+    html += QString("<style>"
                     "body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; "
                     "  color: %1; background: %5; font-size: 13px; }"
                     ".user-label { color: %2; font-weight: bold; margin-top: 8px; "
                     "  font-size: 14px; }"
                     ".ai-label { color: %3; font-weight: bold; margin-top: 8px; "
                     "  font-size: 14px; }"
-                    ".content { margin-left: 8px; margin-bottom: 4px; }"
+                    ".content { margin-left: 8px; margin-bottom: 4px; white-space: pre-wrap; }"
                     "hr { border: 0; border-top: 1px solid %4; margin: 10px 0; }"
-                    "p { margin: 4px 0; line-height: 1.4; }"
-                    "ul { margin: 4px 0 4px 0; padding-left: 24px; }"
-                    "ol { margin: 4px 0 4px 0; padding-left: 24px; }"
-                    "li { margin: 1px 0; padding: 0; }"
-                    "h1, h2, h3 { margin: 8px 0 4px 0; }"
-                    "code { padding: 1px 4px; }"
                     "</style>")
                 .arg(textColor, userColor, aiColor, hrColor, bgColor);
 
@@ -400,21 +391,20 @@ void AiAssistantWidget::refreshChatDisplay()
                 "• 输入问题后点击「发送」<br>"
                 "• 使用 <b>Ctrl+Enter</b> 快捷键发送<br>"
                 "• 在代码编辑器里 <b>右键选中的代码</b> 可以让 AI 分析<br>"
-                "• AI 回复支持 <b>Markdown 格式</b><br>"
                 "</p>";
     } else {
         for (const ChatMessage &msg : m_messages) {
             if (msg.role == "user") {
                 html += QString("<div class='user-label'>👤 你:</div>");
-                // 用户消息只显示纯文本（转义 HTML）
                 QString userContent = msg.content.toHtmlEscaped();
                 userContent.replace("\n", "<br>");
                 html += QString("<div class='content'>%1</div>").arg(userContent);
             } else if (msg.role == "assistant") {
                 html += QString("<div class='ai-label'>🤖 AI:</div>");
-                // AI 回复走 Markdown 渲染
-                html += QString("<div class='content'>%1</div>")
-                            .arg(markdownToHtml(msg.content));
+                // 🆕 简单显示：只转义 HTML + 换行，不做 Markdown 渲染
+                QString aiContent = msg.content.toHtmlEscaped();
+                aiContent.replace("\n", "<br>");
+                html += QString("<div class='content'>%1</div>").arg(aiContent);
             }
             html += "<hr>";
         }
@@ -422,316 +412,8 @@ void AiAssistantWidget::refreshChatDisplay()
 
     m_chatDisplay->setHtml(html);
 
-    // 滚动到底部
+    //滚动到底部
     QTextCursor cursor = m_chatDisplay->textCursor();
     cursor.movePosition(QTextCursor::End);
     m_chatDisplay->setTextCursor(cursor);
-}
-
-// ============================================================
-// 🆕 简单的 Markdown -> HTML 转换
-// 支持：代码块、行内代码、加粗、斜体、标题、列表、链接
-// ============================================================
-QString AiAssistantWidget::markdownToHtml(const QString &markdown) const
-{
-    const Theme &theme = ThemeManager::instance().currentTheme();
-    bool isDark = theme.editorBackground.lightness() < 128;
-
-    // 代码块的背景和边框色
-    QString codeBg = isDark ? "#1E1E1E" : "#F5F5F5";
-    QString codeBorder = isDark ? "#3F3F3F" : "#DDDDDD";
-    QString inlineCodeBg = isDark ? "#2D2D2D" : "#EEEEEE";
-    QString codeColor = isDark ? "#D4D4D4" : "#333333";
-    QString linkColor = isDark ? "#4EC9B0" : "#0078D4";
-    QString headingColor = isDark ? "#569CD6" : "#0066CC";
-
-    QString html = markdown;
-
-    // ===== 步骤 1: 先提取代码块（避免它们被后面的替换影响）=====
-    QRegularExpression codeBlockRegex(
-        "```(\\w*)\\n([\\s\\S]*?)```",
-        QRegularExpression::MultilineOption
-    );
-
-    QVector<QString> codeBlockPlaceholders;
-    QVector<QString> codeBlockContents;
-
-    QRegularExpressionMatchIterator it = codeBlockRegex.globalMatch(html);
-    int codeBlockIndex = 0;
-
-    QString processed;
-    int lastEnd = 0;
-
-    while (it.hasNext()) {
-        QRegularExpressionMatch match = it.next();
-        processed += html.mid(lastEnd, match.capturedStart() - lastEnd);
-
-        QString lang = match.captured(1);
-        QString code = match.captured(2);
-
-        // 转义 HTML 特殊字符
-        code = code.toHtmlEscaped();
-
-        // 生成代码块 HTML
-        QString codeHtml = QString(
-            "<div style='background:%1; border:1px solid %2; "
-            "border-radius:4px; padding:10px; margin:8px 0; "
-            "font-family:Consolas,monospace; font-size:13px; "
-            "color:%3; white-space:pre-wrap;'>"
-            "<code>%4</code></div>"
-        ).arg(codeBg, codeBorder, codeColor, code);
-
-        // 用占位符替换（防止被后面的处理干扰）
-        QString placeholder = QString("§§CODEBLOCK_%1§§").arg(codeBlockIndex);
-        processed += placeholder;
-        codeBlockPlaceholders.append(placeholder);
-        codeBlockContents.append(codeHtml);
-
-        codeBlockIndex++;
-        lastEnd = match.capturedEnd();
-    }
-    processed += html.mid(lastEnd);
-    html = processed;
-
-    // ===== 步骤 2: 转义 HTML 特殊字符（除了占位符）=====
-    // 因为占位符是安全的 §§，先保留它们
-    html = html.toHtmlEscaped();
-
-    // ===== 步骤 3: 处理行内代码 `code` =====
-    QRegularExpression inlineCodeRegex("`([^`\\n]+)`");
-    html.replace(inlineCodeRegex,
-        QString("<code style='background:%1; padding:2px 6px; "
-                "border-radius:3px; font-family:Consolas,monospace; "
-                "font-size:13px; color:%2;'>\\1</code>")
-            .arg(inlineCodeBg, codeColor));
-
-    // ===== 步骤 4: 处理标题 =====
-    // ### 标题
-    QRegularExpression h3Regex("^### (.+)$", QRegularExpression::MultilineOption);
-    html.replace(h3Regex,
-        QString("<h3 style='color:%1; margin:10px 0 6px 0;'>\\1</h3>")
-            .arg(headingColor));
-
-    // ## 标题
-    QRegularExpression h2Regex("^## (.+)$", QRegularExpression::MultilineOption);
-    html.replace(h2Regex,
-        QString("<h2 style='color:%1; margin:12px 0 8px 0;'>\\1</h2>")
-            .arg(headingColor));
-
-    // # 标题
-    QRegularExpression h1Regex("^# (.+)$", QRegularExpression::MultilineOption);
-    html.replace(h1Regex,
-        QString("<h1 style='color:%1; margin:14px 0 10px 0;'>\\1</h1>")
-            .arg(headingColor));
-
-    // ===== 步骤 5: 处理加粗 **text** =====
-    QRegularExpression boldRegex("\\*\\*([^\\*\\n]+)\\*\\*");
-    html.replace(boldRegex, "<b>\\1</b>");
-
-    // ===== 步骤 6: 处理斜体 *text* =====
-    // 注意：要在加粗之后处理，避免误伤 **text**
-    QRegularExpression italicRegex("(?<!\\*)\\*([^\\*\\n]+)\\*(?!\\*)");
-    html.replace(italicRegex, "<i>\\1</i>");
-
-    // ===== 步骤 7: 处理无序列表 =====
-    QStringList lines = html.split('\n');
-    bool inList = false;
-    QStringList resultLines;
-
-    for (const QString &line : lines) {
-        // 匹配 - 或 * 开头的列表项
-        QRegularExpression listRegex("^(\\s*)[-*]\\s+(.+)$");
-        QRegularExpressionMatch match = listRegex.match(line);
-
-        if (match.hasMatch()) {
-            if (!inList) {
-                resultLines.append("<ul style='margin:4px 0; padding-left:20px;'>");
-                inList = true;
-            }
-            resultLines.append(QString("<li>%1</li>").arg(match.captured(2)));
-        } else {
-            if (inList) {
-                resultLines.append("</ul>");
-                inList = false;
-            }
-            resultLines.append(line);
-        }
-    }
-    if (inList) {
-        resultLines.append("</ul>");
-    }
-    html = resultLines.join('\n');
-
-    // ===== 步骤 8: 处理链接 [text](url) =====
-    QRegularExpression linkRegex("\\[([^\\]]+)\\]\\(([^\\)]+)\\)");
-    html.replace(linkRegex,
-        QString("<a href='\\2' style='color:%1;'>\\1</a>").arg(linkColor));
-
-        // ===== 步骤 9: 清理列表相关的多余换行 =====
-    // 列表元素之间的 <br> 会导致额外空白，要清理
-    html.replace(QRegularExpression("<br>\\s*(<ul[^>]*>)"), "\\1");
-    html.replace(QRegularExpression("(</ul>)\\s*<br>"), "\\1");
-    html.replace(QRegularExpression("(</li>)\\s*<br>\\s*(<li)"), "\\1\\2");
-    html.replace(QRegularExpression("(<ul[^>]*>)\\s*<br>"), "\\1");
-    html.replace(QRegularExpression("<br>\\s*(</ul>)"), "\\1");
-
-    // ===== 步骤 10: 处理换行 =====
-    // 双换行 → 段落分隔
-    // 单换行 → <br>
-    html.replace("\n\n", "</p><p>");
-    html.replace("\n", "<br>");
-
-    // 清理段落里的空 <br>
-    html.replace(QRegularExpression("<p[^>]*>\\s*<br>"), "<p style='margin:4px 0; line-height:1.4;'>");
-    html.replace(QRegularExpression("<br>\\s*</p>"), "</p>");
-
-    // 用 <p> 包起来
-    html = "<p style='margin:4px 0; line-height:1.4;'>" + html + "</p>";
-
-    // 清理空段落
-    html.replace(QRegularExpression("<p[^>]*>\\s*</p>"), "");
-    // ===== 步骤 10: 把代码块占位符替换回真实的 HTML =====
-    for (int i = 0; i < codeBlockPlaceholders.size(); ++i) {
-        html.replace(codeBlockPlaceholders[i], codeBlockContents[i]);
-    }
-
-    return html;
-}
-
-// ============================================================
-// 🆕 请求话题建议（专门给思维导图用）
-// ============================================================
-void AiAssistantWidget::requestTopicSuggestions(const QString &parentTopic,
-                                                 const QStringList &existingChildren)
-{
-    if (!hasApiKey()) {
-        emit topicSuggestionsError(tr("请先设置 API Key"));
-        return;
-    }
-
-    m_isRequestingTopics = true;
-    m_topicParent = parentTopic;
-
-    // 构造 prompt
-    QString existingText;
-    if (!existingChildren.isEmpty()) {
-        existingText = tr("\n\n已有的子话题（请不要重复）：\n");
-        for (const QString &child : existingChildren) {
-            existingText += QString("- %1\n").arg(child);
-        }
-    }
-
-    QString prompt = tr(
-        "我在做一个思维导图，父话题是「%1」。%2\n"
-        "请为它生成 5-8 个相关的子话题，帮我扩展思路。\n\n"
-        "要求：\n"
-        "1. 每个话题简短（2-6 个字），适合作为思维导图节点\n"
-        "2. 话题之间有区分度，覆盖不同维度\n"
-        "3. 直接列出话题，不要多余解释\n"
-        "4. 严格使用以下格式，每行一个话题，前面加短横线：\n"
-        "- 话题1\n"
-        "- 话题2\n"
-        "- 话题3\n"
-    ).arg(parentTopic, existingText);
-
-    // 构造请求
-    QUrl url("https://api.deepseek.com/v1/chat/completions");
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    request.setRawHeader("Authorization", ("Bearer " + apiKey()).toUtf8());
-
-    QJsonObject body;
-    body["model"] = "deepseek-chat";
-    body["temperature"] = 0.9;   // 高一点，有创意
-    body["stream"] = false;
-
-    QJsonArray messages;
-
-    QJsonObject systemMsg;
-    systemMsg["role"] = "system";
-    systemMsg["content"] = "你是一个思维导图助手。你的任务是为用户的话题生成相关子话题。"
-                          "请严格按照用户要求的格式返回。";
-    messages.append(systemMsg);
-
-    QJsonObject userMsg;
-    userMsg["role"] = "user";
-    userMsg["content"] = prompt;
-    messages.append(userMsg);
-
-    body["messages"] = messages;
-
-    QJsonDocument doc(body);
-    QByteArray data = doc.toJson();
-
-    // 用独立的 QNetworkAccessManager 请求（避免和聊天冲突）
-    QNetworkAccessManager *tempManager = new QNetworkAccessManager(this);
-    QNetworkReply *reply = tempManager->post(request, data);
-
-    connect(reply, &QNetworkReply::finished, this, [this, reply, tempManager]() {
-        m_isRequestingTopics = false;
-
-        if (reply->error() != QNetworkReply::NoError) {
-            emit topicSuggestionsError(tr("网络错误: %1").arg(reply->errorString()));
-            reply->deleteLater();
-            tempManager->deleteLater();
-            return;
-        }
-
-        QByteArray data = reply->readAll();
-        reply->deleteLater();
-        tempManager->deleteLater();
-
-        QJsonParseError parseError;
-        QJsonDocument doc = QJsonDocument::fromJson(data, &parseError);
-        if (parseError.error != QJsonParseError::NoError) {
-            emit topicSuggestionsError(tr("解析响应失败"));
-            return;
-        }
-
-        QJsonObject root = doc.object();
-
-        if (root.contains("error")) {
-            QJsonObject err = root["error"].toObject();
-            emit topicSuggestionsError(err["message"].toString());
-            return;
-        }
-
-        QJsonArray choices = root["choices"].toArray();
-        if (choices.isEmpty()) {
-            emit topicSuggestionsError(tr("AI 未返回内容"));
-            return;
-        }
-
-        QString content = choices[0].toObject()["message"].toObject()["content"].toString();
-
-        // 解析话题列表（每行一个，前面有 - 或 * 或数字）
-        QStringList topics;
-        QStringList lines = content.split('\n');
-        for (const QString &line : lines) {
-            QString trimmed = line.trimmed();
-            if (trimmed.isEmpty()) continue;
-
-            // 去掉开头的标记
-            QString topic = trimmed;
-            if (topic.startsWith("- ")) topic = topic.mid(2);
-            else if (topic.startsWith("* ")) topic = topic.mid(2);
-            else if (topic.startsWith("• ")) topic = topic.mid(2);
-            else {
-                // 尝试匹配数字开头（如 "1. xxx"）
-                int dotPos = topic.indexOf(". ");
-                if (dotPos > 0 && dotPos < 4) {
-                    bool isNum;
-                    topic.left(dotPos).toInt(&isNum);
-                    if (isNum) topic = topic.mid(dotPos + 2);
-                }
-            }
-
-            topic = topic.trimmed();
-            if (!topic.isEmpty() && topic.length() < 30) {   // 过滤太长的
-                topics.append(topic);
-            }
-        }
-
-        emit topicSuggestionsReady(topics);
-    });
 }

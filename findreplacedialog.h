@@ -3,38 +3,27 @@
 
 #include <QDialog>
 
-// 前置声明
 class QLineEdit;
 class QCheckBox;
 class QPushButton;
 class QPlainTextEdit;
 
-class FindReplaceDialog : public QDialog
+class FindReplaceDialog:public QDialog
 {
     Q_OBJECT
 
 public:
-    // 构造函数需要传入要操作的编辑器
-    explicit FindReplaceDialog(QPlainTextEdit *editor, QWidget *parent = nullptr);
-
-    // 切换目标编辑器（因为多标签，当前编辑器可能会变）
+    explicit FindReplaceDialog(QPlainTextEdit *editor, QWidget *parent=nullptr);
     void setEditor(QPlainTextEdit *editor);
-
 private slots:
-    void onFindNext();       // 查找下一个
-    void onFindPrevious();   // 查找上一个
-    void onReplace();        // 替换当前
-    void onReplaceAll();     // 全部替换
-
+    void onFindNext();       
+    void onFindPrevious();   
+    void onReplace();       
+    void onReplaceAll();     
 private:
-    void setupUi();          // 构建界面
-
-    // 内部辅助
+    void setupUi();      
     bool doFind(bool forward);
-
-    QPlainTextEdit *m_editor;    // 目标编辑器
-
-    // UI 控件
+    QPlainTextEdit *m_editor;  
     QLineEdit *m_findLineEdit;
     QLineEdit *m_replaceLineEdit;
     QCheckBox *m_caseSensitiveCheckBox;

@@ -3,7 +3,6 @@
 #include "thememanager.h"
 #include "generichighlighter.h"
 #include "syntaxmanager.h"
-#include "minimapwidget.h"
 #include "mainwindow.h"
 #include <QDebug>
 #include <QFile>
@@ -52,9 +51,6 @@ EditorWidget::EditorWidget(QWidget *parent)
 
     m_lineNumberArea = new LineNumberArea(this);
     m_foldArea = new FoldArea(this);   
-        // 🆕 创建迷你地图
-    m_minimap = new MinimapWidget(this, this);
-    m_showMinimap = true;
     connect(this, &EditorWidget::blockCountChanged,
             this, &EditorWidget::updateLineNumberAreaWidth);
     connect(this, &EditorWidget::updateRequest,
@@ -115,9 +111,7 @@ int EditorWidget::lineNumberAreaWidth()
 
 void EditorWidget::updateLineNumberAreaWidth(int)
 {
-    // 🆕 左边留行号+折叠区，右边留迷你地图
-    int rightMargin = m_showMinimap ? minimapWidth() : 0;
-    setViewportMargins(lineNumberAreaWidth() + foldAreaWidth(), 0, rightMargin, 0);
+    setViewportMargins(lineNumberAreaWidth() + foldAreaWidth(), 0, 0, 0);
 }
 
 void EditorWidget::updateLineNumberArea(const QRect &rect, int dy)
@@ -150,15 +144,6 @@ void EditorWidget::resizeEvent(QResizeEvent *event)
               foldAreaWidth(), cr.height())
     );
 
-    // 🆕 迷你地图（右侧）
-    if (m_showMinimap && m_minimap) {
-        int mmWidth = minimapWidth();
-        m_minimap->setGeometry(
-            QRect(cr.right() - mmWidth + 1, cr.top(),
-                  mmWidth, cr.height())
-        );
-        m_minimap->show();
-    }
 }
 
 void EditorWidget::lineNumberAreaPaintEvent(QPaintEvent *event)
@@ -945,13 +930,6 @@ void EditorWidget::unfoldAll()
     emit foldCountChanged(foldedCount());
 }
 
-// ============================================================
-// 🆕 迷你地图
-// ============================================================
-int EditorWidget::minimapWidth() const
-{
-    return 120;
-}
 
 // ============================================================
 // 🆕 自定义右键菜单（含 AI 功能）

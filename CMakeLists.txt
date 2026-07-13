@@ -35,29 +35,11 @@ add_executable(CodeEditor
     syntaxmanager.h
     preferencesdialog.cpp        
     preferencesdialog.h  
-    filetreewidget.cpp     
-    filetreewidget.h  
     task.h                   
     tasklistwidget.cpp       
     tasklistwidget.h 
-    commandpalette.cpp       
-    commandpalette.h
-    minimapwidget.cpp        
-    minimapwidget.h 
     aiassistantwidget.cpp        
     aiassistantwidget.h
-    terminalwidget.cpp        
-    terminalwidget.h  
-    mindmapview.cpp       
-    mindmapview.h
-    mindnode.cpp       
-    mindnode.h  
-    mindedge.cpp        
-    mindedge.h
-    mindmapcommands.cpp   
-    mindmapcommands.h
-    mindmapaidialog.cpp    
-    mindmapaidialog.h
 )
 
 target_link_libraries(CodeEditor PRIVATE Qt5::Widgets Qt5::Network)

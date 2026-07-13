@@ -1,20 +1,14 @@
 #include "cpphighlighter.h"
 #include "thememanager.h"
 
-CppHighlighter::CppHighlighter(QTextDocument *parent)
-    : Highlighter(parent)
-{
+CppHighlighter::CppHighlighter(QTextDocument *parent):Highlighter(parent){
     setupRules();
 }
 
 void CppHighlighter::setupRules()
 {
-    // 从主题管理器获取当前主题
-    const Theme &theme = ThemeManager::instance().currentTheme();
-
+    const Theme &theme = ThemeManager::instance().currentTheme();//获取当前主题
     HighlightRule rule;
-
-    // ===== 关键字 =====
     QTextCharFormat keywordFormat;
     keywordFormat.setForeground(theme.keywordColor);
     keywordFormat.setFontWeight(QFont::Bold);
@@ -40,64 +34,56 @@ void CppHighlighter::setupRules()
         "\\bauto\\b", "\\boverride\\b", "\\bfinal\\b"
     };
 
-    for (const QString &pattern : keywordPatterns) {
+    for (const QString &pattern:keywordPatterns){
         rule.pattern = QRegularExpression(pattern);
         rule.format = keywordFormat;
         m_rules.append(rule);
     }
-
-    // Qt 类
+    //Qt类
     QTextCharFormat qtClassFormat;
     qtClassFormat.setForeground(theme.qtClassColor);
     qtClassFormat.setFontWeight(QFont::Bold);
     rule.pattern = QRegularExpression("\\bQ[A-Za-z]+\\b");
     rule.format = qtClassFormat;
     m_rules.append(rule);
-
-    // 预处理
+    //预处理
     QTextCharFormat preprocessorFormat;
     preprocessorFormat.setForeground(theme.preprocessorColor);
     rule.pattern = QRegularExpression("^\\s*#[^\n]*");
     rule.format = preprocessorFormat;
     m_rules.append(rule);
-
-    // 数字
+    //数字
     QTextCharFormat numberFormat;
     numberFormat.setForeground(theme.numberColor);
     rule.pattern = QRegularExpression("\\b[0-9]+\\.?[0-9]*\\b");
     rule.format = numberFormat;
     m_rules.append(rule);
-
-    // 字符串
+    //字符串
     QTextCharFormat quotationFormat;
     quotationFormat.setForeground(theme.stringColor);
     rule.pattern = QRegularExpression("\".*?\"");
     rule.format = quotationFormat;
     m_rules.append(rule);
-
-    // 字符
+    //字符
     QTextCharFormat charFormat;
     charFormat.setForeground(theme.stringColor);
     rule.pattern = QRegularExpression("'.'");
     rule.format = charFormat;
     m_rules.append(rule);
-
-    // 函数
+    //函数
     QTextCharFormat functionFormat;
     functionFormat.setForeground(theme.functionColor);
     rule.pattern = QRegularExpression("\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()");
     rule.format = functionFormat;
     m_rules.append(rule);
-
-    // 单行注释
+    //单行注释
     QTextCharFormat singleLineCommentFormat;
     singleLineCommentFormat.setForeground(theme.commentColor);
     singleLineCommentFormat.setFontItalic(true);
     rule.pattern = QRegularExpression("//[^\n]*");
     rule.format = singleLineCommentFormat;
     m_rules.append(rule);
-
-    // 多行注释
+    //多行注释
     m_multiLineCommentFormat.setForeground(theme.commentColor);
     m_multiLineCommentFormat.setFontItalic(true);
     m_commentStartExpression = QRegularExpression("/\\*");

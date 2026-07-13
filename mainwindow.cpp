@@ -3,12 +3,8 @@
 #include "findreplacedialog.h"
 #include "thememanager.h"
 #include "preferencesdialog.h"
-#include "filetreewidget.h"
 #include "tasklistwidget.h"
-#include "commandpalette.h"
 #include "aiassistantwidget.h"
-#include "terminalwidget.h"
-#include "mindmapview.h"
 #include "thememanager.h"
 #include <QDockWidget>
 #include <QLabel>
@@ -22,25 +18,14 @@
 #include <QCloseEvent>
 #include <QPlainTextEdit>   
 #include <QSettings>
-#include <QDragEnterEvent>
-#include <QDropEvent>
-#include <QMimeData>
 #include <QToolBar>
 #include <QStyle>
 #include <QIcon>
-#include <QStackedWidget>
-#include <QActionGroup>
-#include "mindmapaidialog.h"
-#include "mindnode.h"
-#include "mindmapcommands.h"
 #include <QDateTime>
 
-MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), m_findReplaceDialog(nullptr)
+MainWindow::MainWindow(QWidget *parent):QMainWindow(parent), m_findReplaceDialog(nullptr)
 {
-    // ============================================================
-    // 阶段 1: 初始化状态栏 label（必须最先，因为后面各种 update 会用）
-    // ============================================================
+    //初始化状态栏label
     m_cursorPositionLabel = new QLabel(tr("行:1 列:1"), this);
     m_encodingLabel = new QLabel(tr("UTF-8"), this);
     m_charCountLabel = new QLabel(tr("0 字符"), this);
@@ -58,10 +43,7 @@ MainWindow::MainWindow(QWidget *parent)
     statusBar()->addPermanentWidget(m_charCountLabel);
     statusBar()->addPermanentWidget(m_foldCountLabel);
     statusBar()->addPermanentWidget(m_taskCountLabel);
-
-    // ============================================================
-    // 阶段 2: 创建标签页
-    // ============================================================
+    //创建标签页
     m_tabWidget = new QTabWidget(this);
     m_tabWidget->setTabsClosable(true);
     m_tabWidget->setMovable(true);
@@ -70,45 +52,13 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::closeTab);
     connect(m_tabWidget, &QTabWidget::currentChanged,
             this, &MainWindow::onCurrentTabChanged);
+        setCentralWidget(m_tabWidget);
 
-        // 🆕 用 QStackedWidget 管理两个模式
-    m_modeStack = new QStackedWidget(this);
-
-    // 编辑器模式：把 tabWidget 作为编辑器模式的内容
-    m_editorModeWidget = m_tabWidget;
-    m_modeStack->addWidget(m_editorModeWidget);   // index 0 = 编辑器
-
-    // 思维导图模式：创建画布
-    m_mindMapView = new MindMapView(this);
-    m_modeStack->addWidget(m_mindMapView);         // index 1 = 思维导图
-
-    setCentralWidget(m_modeStack);
-
-    // 创建模式切换工具栏
-    createModeSwitcher();
-
-    // ============================================================
-    // 阶段 3: 创建菜单和工具栏
-    // ============================================================
+    //创建菜单和工具栏
     createMenus();
     createToolBars();
 
-    // ============================================================
-    // 阶段 4: 创建所有 dock widget（必须在 createEditor 之前）
-    // ============================================================
-
-    // 4.1 文件树 dock（左侧）
-    m_fileTreeWidget = new FileTreeWidget(this);
-    m_fileTreeDock = new QDockWidget(tr("文件浏览器"), this);
-    m_fileTreeDock->setObjectName("fileTreeDock");
-    m_fileTreeDock->setWidget(m_fileTreeWidget);
-    m_fileTreeDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    addDockWidget(Qt::LeftDockWidgetArea, m_fileTreeDock);
-
-    connect(m_fileTreeWidget, &FileTreeWidget::fileDoubleClicked,
-            this, &MainWindow::onFileTreeDoubleClicked);
-
-    // 4.2 任务清单 dock（右侧）
+    //创建任务清单dock
     m_taskListWidget = new TaskListWidget(this);
     m_taskListDock = new QDockWidget(tr("任务清单"), this);
     m_taskListDock->setObjectName("taskListDock");
@@ -119,85 +69,29 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_taskListWidget, &TaskListWidget::taskCountChanged,
             this, &MainWindow::updateTaskCount);
 
-    // 4.3 AI 助手 dock（右侧，和任务清单 tab 化）
+    //创建AI助手dock
     m_aiAssistantWidget = new AiAssistantWidget(this);
     m_aiDock = new QDockWidget(tr("AI 助手"), this);
     m_aiDock->setObjectName("aiDock");
     m_aiDock->setWidget(m_aiAssistantWidget);
     m_aiDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
     addDockWidget(Qt::RightDockWidgetArea, m_aiDock);
-
-    // 🆕 创建终端 dock（底部）
-    m_terminalWidget = new TerminalWidget(this);
-    m_terminalDock = new QDockWidget(tr("终端 / 输出"), this);
-    m_terminalDock->setObjectName("terminalDock");
-    m_terminalDock->setWidget(m_terminalWidget);
-    m_terminalDock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
-    addDockWidget(Qt::BottomDockWidgetArea, m_terminalDock);
-    m_terminalDock->hide();   // 默认隐藏，运行时自动显示
-
-    // 让 AI 助手和任务清单 tab 化（切换显示）
     tabifyDockWidget(m_taskListDock, m_aiDock);
-
-    // 默认显示任务清单在前
     m_taskListDock->raise();
-
-    // 立即更新任务数量
     updateTaskCount(m_taskListWidget->totalCount(),
-                    m_taskListWidget->completedCount());
-
-    // ============================================================
-    // 阶段 5: 从 QSettings 恢复文件树目录
-    // ============================================================
-    {
-        QSettings settings("MyCompany", "CodeEditor");
-        QString lastFolder = settings.value("fileTree/rootPath").toString();
-        if (!lastFolder.isEmpty()) {
-            m_fileTreeWidget->setRootPath(lastFolder);
-        }
-    }
-
-    // ============================================================
-    // 阶段 6: 创建初始编辑器（现在所有 widget 都准备好了）
-    // ============================================================
-    createEditor();
-
-    // ============================================================
-    // 阶段 7: 命令面板
-    // ============================================================
-    m_commandPalette = new CommandPalette(this);
-    registerCommands();
-
-    // ============================================================
-    // 阶段 8: 窗口设置
-    // ============================================================
-    resize(1200, 800);   // 🆕 默认大小改大一点
+                    m_taskListWidget->completedCount()); //更新任务数量
+    createEditor(); //创建初始编辑器
+    
+    resize(1200, 800);  // 窗口设置
     setWindowTitle(tr("CodeEditor"));
 
-    // ============================================================
-    // 阶段 9: 加载最近文件 + 会话恢复
-    // ============================================================
-    loadRecentFiles();
-    updateRecentFilesMenu();
-    setAcceptDrops(true);
-
-    // 🆕 监听思维导图文件变化
-    if (m_mindMapView) {
-        connect(m_mindMapView, &MindMapView::fileInfoChanged,
-                this, &MainWindow::updateWindowTitleForMindMap);
-    }
-
-    // 🆕 最后再恢复会话（这时候所有依赖的都准备好了）
-    restoreSession();
+    restoreSession();//恢复会话
 }
 
-MainWindow::~MainWindow()
-{
-}
+MainWindow::~MainWindow(){}
 
-void MainWindow::createMenus()
-{
-    // ===== 文件菜单 =====
+void MainWindow::createMenus(){
+    //文件菜单
     QMenu *fileMenu = menuBar()->addMenu(tr("文件(&F)"));
 
     QAction *newAction = new QAction(tr("新建(&N)"), this);
@@ -219,81 +113,16 @@ void MainWindow::createMenus()
     saveAsAction->setShortcut(QKeySequence::SaveAs);
     connect(saveAsAction, &QAction::triggered, this, &MainWindow::saveAsFile);
     fileMenu->addAction(saveAsAction);
-        //  最近打开子菜单
-    fileMenu->addSeparator();
-    m_recentFilesMenu = fileMenu->addMenu(tr("最近打开(&R)"));
-    updateRecentFilesMenu();   // 初始化菜单内容
     fileMenu->addSeparator();
 
     QAction *exitAction = new QAction(tr("退出(&X)"), this);
     exitAction->setShortcut(QKeySequence::Quit);
     connect(exitAction, &QAction::triggered, this, &QWidget::close);
     fileMenu->addAction(exitAction);
-
-    // 🆕 思维导图菜单
-    QMenu *mindMapMenu = menuBar()->addMenu(tr("思维导图(&M)"));
-
-    QAction *newMindAct = new QAction(tr("🧠 新建思维导图"), this);
-    connect(newMindAct, &QAction::triggered, this, &MainWindow::newMindMap);
-    mindMapMenu->addAction(newMindAct);
-
-    QAction *openMindAct = new QAction(tr("🧠 打开思维导图..."), this);
-    connect(openMindAct, &QAction::triggered, this, &MainWindow::openMindMap);
-    mindMapMenu->addAction(openMindAct);
-
-    mindMapMenu->addSeparator();
-
-    QAction *saveMindAct = new QAction(tr("🧠 保存思维导图"), this);
-    connect(saveMindAct, &QAction::triggered, this, &MainWindow::saveMindMap);
-    mindMapMenu->addAction(saveMindAct);
-
-    QAction *saveAsMindAct = new QAction(tr("🧠 另存为..."), this);
-    connect(saveAsMindAct, &QAction::triggered, this, &MainWindow::saveAsMindMap);
-    mindMapMenu->addAction(saveAsMindAct);
-
-    mindMapMenu->addSeparator();
-
-    QAction *exportAct = new QAction(tr("🖼️ 导出为 PNG 图片..."), this);
-    connect(exportAct, &QAction::triggered, this, &MainWindow::exportMindMapImage);
-    mindMapMenu->addAction(exportAct);
-
-        // 🆕 撤销/重做
-    mindMapMenu->addSeparator();
-
-    QAction *undoMindAct = new QAction(tr("↶ 撤销"), this);
-    undoMindAct->setShortcut(tr("Ctrl+Z"));
-    connect(undoMindAct, &QAction::triggered, this, &MainWindow::mindMapUndo);
-    mindMapMenu->addAction(undoMindAct);
-
-    QAction *redoMindAct = new QAction(tr("↷ 重做"), this);
-    redoMindAct->setShortcut(tr("Ctrl+Y"));
-    connect(redoMindAct, &QAction::triggered, this, &MainWindow::mindMapRedo);
-    mindMapMenu->addAction(redoMindAct);
-        // 🆕 运行菜单
-    QMenu *runMenu = menuBar()->addMenu(tr("运行(&R)"));
-    m_runAction = new QAction(tr("▶ 运行当前文件"), this);
-    m_runAction->setShortcut(tr("F5"));
-    connect(m_runAction, &QAction::triggered, this, &MainWindow::runCurrentFile);
-    runMenu->addAction(m_runAction);
-
-    QAction *stopAction = new QAction(tr("⏹️ 停止运行"), this);
-    stopAction->setShortcut(tr("Shift+F5"));
-    connect(stopAction, &QAction::triggered, [this]() {
-        if (m_terminalWidget) m_terminalWidget->stopProcess();
-    });
-    runMenu->addAction(stopAction);
-
-        // ===== 🆕 视图菜单 =====
+    //视图菜单
     QMenu *viewMenu = menuBar()->addMenu(tr("视图(&V)"));
-
     QMenu *themeMenu = viewMenu->addMenu(tr("主题(&T)"));
-        // 🆕 命令面板
-    QAction *commandPaletteAction = new QAction(tr("命令面板(&C)..."), this);
-    commandPaletteAction->setShortcut(tr("Ctrl+Shift+P"));
-    connect(commandPaletteAction, &QAction::triggered,
-            this, &MainWindow::showCommandPalette);
-    viewMenu->addAction(commandPaletteAction);   
-    // 🆕 字体缩放菜单项
+    //字体缩放
     viewMenu->addSeparator();
     QAction *zoomInAction = new QAction(tr("放大字体"), this);
     zoomInAction->setShortcut(QKeySequence::ZoomIn);   // Ctrl++
@@ -319,42 +148,14 @@ void MainWindow::createMenus()
     connect(darkThemeAction, &QAction::triggered,
             this, &MainWindow::switchToDarkTheme);
     themeMenu->addAction(darkThemeAction);
-
-        // 🆕 显示/隐藏终端
-    m_toggleTerminalAction = new QAction(tr("显示终端(&M)"), this);
-    m_toggleTerminalAction->setCheckable(true);
-    m_toggleTerminalAction->setChecked(false);
-    m_toggleTerminalAction->setShortcut(tr("Ctrl+`"));
-    connect(m_toggleTerminalAction, &QAction::triggered,
-            this, &MainWindow::toggleTerminal);
-    viewMenu->addAction(m_toggleTerminalAction);
-
-    // ===== 🆕 编辑菜单 =====
+    //编辑菜单
     QMenu *editMenu = menuBar()->addMenu(tr("编辑(&E)"));
-
     QAction *findAction = new QAction(tr("查找和替换(&F)..."), this);
     findAction->setShortcut(QKeySequence::Find);   // Ctrl+F
     connect(findAction, &QAction::triggered, this, &MainWindow::showFindReplaceDialog);
     editMenu->addAction(findAction);
-        // 🆕 显示/隐藏文件树
-    m_toggleFileTreeAction = new QAction(tr("显示文件浏览器(&E)"), this);
-    m_toggleFileTreeAction->setCheckable(true);
-    m_toggleFileTreeAction->setChecked(true);
-    m_toggleFileTreeAction->setShortcut(tr("Ctrl+B"));
-    connect(m_toggleFileTreeAction, &QAction::triggered,
-            this, &MainWindow::toggleFileTree);
-    viewMenu->addAction(m_toggleFileTreeAction);
 
-    // 🆕 打开文件夹菜单项
-    QAction *openFolderAction = new QAction(tr("打开文件夹(&D)..."), this);
-    openFolderAction->setShortcut(tr("Ctrl+K, Ctrl+O"));
-    connect(openFolderAction, &QAction::triggered,
-            this, &MainWindow::openFolderInTree);
-    viewMenu->addAction(openFolderAction);
-
-    viewMenu->addSeparator();
-
-        // 🆕 显示/隐藏任务清单
+    //显示/隐藏任务清单或 AI 助手
     m_toggleTaskListAction = new QAction(tr("显示任务清单(&T)"), this);
     m_toggleTaskListAction->setCheckable(true);
     m_toggleTaskListAction->setChecked(true);
@@ -362,8 +163,6 @@ void MainWindow::createMenus()
     connect(m_toggleTaskListAction, &QAction::triggered,
             this, &MainWindow::toggleTaskList);
     viewMenu->addAction(m_toggleTaskListAction);
-
-        // 🆕 显示/隐藏 AI 助手
     m_toggleAiAction = new QAction(tr("显示 AI 助手(&I)"), this);
     m_toggleAiAction->setCheckable(true);
     m_toggleAiAction->setChecked(true);
@@ -371,8 +170,7 @@ void MainWindow::createMenus()
     connect(m_toggleAiAction, &QAction::triggered,
             this, &MainWindow::toggleAiAssistant);
     viewMenu->addAction(m_toggleAiAction);
-
-            // 🆕 折叠菜单
+    //折叠菜单
     viewMenu->addSeparator();
     QAction *foldAllAction = new QAction(tr("折叠所有"), this);
     foldAllAction->setShortcut(tr("Ctrl+K, Ctrl+0"));
@@ -391,8 +189,7 @@ void MainWindow::createMenus()
     viewMenu->addAction(prefAction);
 }
 
-EditorWidget *MainWindow::createEditor()
-{
+EditorWidget *MainWindow::createEditor(){
     EditorWidget *editor = new EditorWidget(this);
     int index = m_tabWidget->addTab(editor, editor->userFriendlyName());
     m_tabWidget->setCurrentIndex(index);
@@ -403,31 +200,26 @@ EditorWidget *MainWindow::createEditor()
     return editor;
 }
 
-EditorWidget *MainWindow::currentEditor() const
-{
+EditorWidget *MainWindow::currentEditor() const{
     return qobject_cast<EditorWidget *>(m_tabWidget->currentWidget());
 }
 
-void MainWindow::newFile()
-{
+void MainWindow::newFile(){
     createEditor();
 }
 
-void MainWindow::openFile()
-{
+void MainWindow::openFile(){
     QString fileName = QFileDialog::getOpenFileName(this, tr("打开文件"));
     openFileByPath(fileName);
 }
-void MainWindow::saveFile()
-{
+void MainWindow::saveFile(){
     EditorWidget *editor = currentEditor();
     if (editor) {
         editor->save();
     }
 }
 
-void MainWindow::saveAsFile()
-{
+void MainWindow::saveAsFile(){
     EditorWidget *editor = currentEditor();
     if (!editor) return;
 
@@ -437,8 +229,7 @@ void MainWindow::saveAsFile()
     editor->saveAs(fileName);
 }
 
-void MainWindow::closeTab(int index)
-{
+void MainWindow::closeTab(int index){
     EditorWidget *editor = qobject_cast<EditorWidget *>(m_tabWidget->widget(index));
     if (!editor) return;
 
@@ -454,8 +245,7 @@ void MainWindow::closeTab(int index)
     }
 }
 
-void MainWindow::updateTabTitle()
-{
+void MainWindow::updateTabTitle(){
     EditorWidget *editor = qobject_cast<EditorWidget *>(sender());
     if (!editor) return;
 
@@ -470,16 +260,14 @@ void MainWindow::updateTabTitle()
     m_tabWidget->setTabText(index, title);
 }
 
-void MainWindow::onCurrentTabChanged(int index)
-{
+void MainWindow::onCurrentTabChanged(int index){
     Q_UNUSED(index);
     EditorWidget *editor = currentEditor();
     if (editor) {
         QString name = editor->currentFile().isEmpty() ?
                        tr("未命名") : editor->currentFile();
-        statusBar()->showMessage(name);   // 左侧：文件路径
-
-        // 🆕 连接光标和内容变化信号（先断开避免重复连接）
+        statusBar()->showMessage(name);   
+        //连接光标和内容变化信号
         disconnect(editor, &QPlainTextEdit::cursorPositionChanged,
                    this, &MainWindow::updateStatusBarInfo);
         disconnect(editor, &QPlainTextEdit::textChanged,
@@ -489,28 +277,23 @@ void MainWindow::onCurrentTabChanged(int index)
                 this, &MainWindow::updateStatusBarInfo);
         connect(editor, &QPlainTextEdit::textChanged,
                 this, &MainWindow::updateStatusBarInfo);
-            // 🆕 连接折叠数量变化
+            //连接折叠数量变化
     disconnect(editor, &EditorWidget::foldCountChanged,
                this, &MainWindow::updateFoldCount);
     connect(editor, &EditorWidget::foldCountChanged,
             this, &MainWindow::updateFoldCount);
-
-    // 立即更新一次
-    updateFoldCount(editor->foldedCount());
-        // 立即更新一次
-        updateStatusBarInfo();
-
-        if (m_findReplaceDialog) {
+    updateFoldCount(editor->foldedCount());// 立即更新一次
+    updateStatusBarInfo();// 立即更新一次
+    if (m_findReplaceDialog) {
             m_findReplaceDialog->setEditor(editor);
         }
-    } else {
+    }else{
         statusBar()->clearMessage();
     }
 }
 
-// ===== 🆕 显示查找替换对话框 =====
-void MainWindow::showFindReplaceDialog()
-{
+//显示查找替换对话框
+void MainWindow::showFindReplaceDialog(){
     EditorWidget *editor = currentEditor();
     if (!editor) return;
 
@@ -525,31 +308,9 @@ void MainWindow::showFindReplaceDialog()
     m_findReplaceDialog->activateWindow();
 }
 
-void MainWindow::closeEvent(QCloseEvent *event)
-{
-    // 🆕 检查思维导图是否有未保存修改
-    if (m_mindMapView && m_mindMapView->isModified()) {
-        auto ret = QMessageBox::warning(
-            this,
-            tr("提示"),
-            tr("思维导图已修改，是否保存？"),
-            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+void MainWindow::closeEvent(QCloseEvent *event){
 
-        if (ret == QMessageBox::Save) {
-            saveMindMap();
-            // 如果保存后还是 modified，说明用户取消了保存对话框
-            if (m_mindMapView->isModified()) {
-                event->ignore();
-                return;
-            }
-        } else if (ret == QMessageBox::Cancel) {
-            event->ignore();
-            return;
-        }
-        // Discard: 继续关闭
-    }
-
-    // 先询问未保存的文件
+    //询问未保存的文件
     for (int i = 0; i < m_tabWidget->count(); ++i) {
         EditorWidget *editor = qobject_cast<EditorWidget *>(m_tabWidget->widget(i));
         if (editor && !editor->maybeSave()) {
@@ -562,649 +323,252 @@ void MainWindow::closeEvent(QCloseEvent *event)
     event->accept();
 }
 
-// ===== 🆕 主题切换 =====
-void MainWindow::switchToLightTheme()
-{
+//主题切换
+void MainWindow::switchToLightTheme(){
     ThemeManager::instance().setLightTheme();
 }
 
-void MainWindow::switchToDarkTheme()
-{
+void MainWindow::switchToDarkTheme(){
     ThemeManager::instance().setDarkTheme();
 }
 
-// ===== 🆕 更新状态栏信息 =====
-void MainWindow::updateStatusBarInfo()
-{
-    if (!m_cursorPositionLabel || !m_encodingLabel || !m_charCountLabel) {
+//更新状态栏信息
+void MainWindow::updateStatusBarInfo(){
+    if (!m_cursorPositionLabel||!m_encodingLabel||!m_charCountLabel){
         return;
     }
     EditorWidget *editor = currentEditor();
     if (!editor) return;
-
     // 获取光标位置
     QTextCursor cursor = editor->textCursor();
-    int line = cursor.blockNumber() + 1;      // 从 1 开始
+    int line = cursor.blockNumber() + 1; 
     int column = cursor.columnNumber() + 1;
-
     // 更新行列号
     m_cursorPositionLabel->setText(tr("行:%1 列:%2").arg(line).arg(column));
-
     // 更新字符数
-    int charCount = editor->document()->characterCount() - 1;  // -1 是因为末尾有个隐藏字符
+    int charCount = editor->document()->characterCount()-1;
     m_charCountLabel->setText(tr("%1 字符").arg(charCount));
 }
 
-// ============================================================
-// 🆕 最近打开的文件
-// ============================================================
-
-// 从 QSettings 加载历史
-void MainWindow::loadRecentFiles()
-{
-    QSettings settings("MyCompany", "CodeEditor");
-    m_recentFiles = settings.value("recentFiles").toStringList();
-
-    // 清理不存在的文件
-    QStringList existing;
-    for (const QString &path : m_recentFiles) {
-        if (QFileInfo::exists(path)) {
-            existing.append(path);
-        }
-    }
-    m_recentFiles = existing;
-}
-
-// 保存到 QSettings
-void MainWindow::saveRecentFiles()
-{
-    QSettings settings("MyCompany", "CodeEditor");
-    settings.setValue("recentFiles", m_recentFiles);
-}
-
-// 添加一个文件到历史
-void MainWindow::addRecentFile(const QString &filePath)
-{
-    // 如果已存在，先移除（要放到最前面）
-    m_recentFiles.removeAll(filePath);
-
-    // 加到最前面
-    m_recentFiles.prepend(filePath);
-
-    // 限制最多 MaxRecentFiles 个
-    while (m_recentFiles.size() > MaxRecentFiles) {
-        m_recentFiles.removeLast();
-    }
-
-    // 保存 + 刷新菜单
-    saveRecentFiles();
-    updateRecentFilesMenu();
-}
-
-// 刷新菜单显示
-void MainWindow::updateRecentFilesMenu()
-{
-    if (!m_recentFilesMenu) return;
-
-    m_recentFilesMenu->clear();   // 清空现有菜单项
-
-    if (m_recentFiles.isEmpty()) {
-        // 空历史时，显示一个禁用的"（无）"
-        QAction *emptyAction = m_recentFilesMenu->addAction(tr("(无)"));
-        emptyAction->setEnabled(false);
-        return;
-    }
-
-    // 添加每个文件
-    for (int i = 0; i < m_recentFiles.size(); ++i) {
-        QString filePath = m_recentFiles.at(i);
-        QString fileName = QFileInfo(filePath).fileName();
-
-        // 菜单项文字：序号 + 文件名
-        QString itemText = tr("%1  %2").arg(i + 1).arg(filePath);
-
-        QAction *action = m_recentFilesMenu->addAction(itemText);
-        // 把完整路径存到 action 的 data 里
-        action->setData(filePath);
-        connect(action, &QAction::triggered, this, &MainWindow::openRecentFile);
-    }
-
-    // 分隔线 + 清空按钮
-    m_recentFilesMenu->addSeparator();
-    QAction *clearAction = m_recentFilesMenu->addAction(tr("清空历史记录"));
-    connect(clearAction, &QAction::triggered, this, &MainWindow::clearRecentFiles);
-}
-
-// 点击某个最近文件时触发
-void MainWindow::openRecentFile()
-{
-    QAction *action = qobject_cast<QAction *>(sender());
-    if (!action) return;
-
-    QString filePath = action->data().toString();
-
-    // 如果文件不存在，从历史里移除
-    if (!QFileInfo::exists(filePath)) {
-        QMessageBox::warning(this, tr("警告"),
-                             tr("文件不存在：%1").arg(filePath));
-        m_recentFiles.removeAll(filePath);
-        saveRecentFiles();
-        updateRecentFilesMenu();
-        return;
-    }
-
-    openFileByPath(filePath);
-}
-
-// 清空历史
-void MainWindow::clearRecentFiles()
-{
-    m_recentFiles.clear();
-    saveRecentFiles();
-    updateRecentFilesMenu();
-}
-
-// ============================================================
-// 🆕 打开指定路径的文件（供外部调用）
-// ============================================================
-void MainWindow::openFileByPath(const QString &filePath)
-{
+//打开文件
+void MainWindow::openFileByPath(const QString &filePath){
     if (filePath.isEmpty()) return;
-
-    // 检查文件是否存在
     if (!QFileInfo::exists(filePath)) {
-        QMessageBox::warning(this, tr("警告"),
-                             tr("文件不存在：%1").arg(filePath));
+        QMessageBox::warning(this, tr("警告"),tr("文件不存在：%1").arg(filePath));
         return;
     }
-
-    // 检查是否已打开
     for (int i = 0; i < m_tabWidget->count(); ++i) {
         EditorWidget *editor = qobject_cast<EditorWidget *>(m_tabWidget->widget(i));
         if (editor && editor->currentFile() == filePath) {
             m_tabWidget->setCurrentIndex(i);
-            addRecentFile(filePath);
             return;
         }
     }
-
-    // 决定用当前标签还是新建标签
     EditorWidget *editor = currentEditor();
-    if (!editor || !editor->currentFile().isEmpty() || editor->isModified()) {
+    if (!editor || !editor->currentFile().isEmpty() || editor->isModified()){
         editor = createEditor();
     }
-
-    // 加载
-    if (editor->loadFile(filePath)) {
-        addRecentFile(filePath);
-    } else {
-        int idx = m_tabWidget->indexOf(editor);
-        if (idx >= 0) {
+    if(editor->loadFile(filePath)){
+    }else{
+        int idx=m_tabWidget->indexOf(editor);
+        if(idx>=0) {
             m_tabWidget->removeTab(idx);
             editor->deleteLater();
         }
     }
 }
-
-// ============================================================
-// 🆕 拖放事件处理
-// ============================================================
-
-// 用户拖东西进来时触发（判断要不要接受）
-void MainWindow::dragEnterEvent(QDragEnterEvent *event)
-{
-    // 只接受"文件"类型的拖放
-    if (event->mimeData()->hasUrls()) {
-        event->acceptProposedAction();
-    }
-}
-
-// 用户放下时触发（真正处理）
-void MainWindow::dropEvent(QDropEvent *event)
-{
-    const QMimeData *mimeData = event->mimeData();
-    if (!mimeData->hasUrls()) return;
-
-    // 遍历所有拖进来的文件
-    QList<QUrl> urls = mimeData->urls();
-    for (const QUrl &url : urls) {
-        QString filePath = url.toLocalFile();
-        if (!filePath.isEmpty()) {
-            openFileByPath(filePath);
-        }
-    }
-
-    event->acceptProposedAction();
-}
-
-// ============================================================
-// 🆕 字体缩放
-// ============================================================
-void MainWindow::zoomIn()
-{
+//字体缩放
+void MainWindow::zoomIn(){
     EditorWidget *editor = currentEditor();
     if (editor) editor->zoomIn();
 }
 
-void MainWindow::zoomOut()
-{
+void MainWindow::zoomOut(){
     EditorWidget *editor = currentEditor();
     if (editor) editor->zoomOut();
 }
 
-void MainWindow::resetZoom()
-{
+void MainWindow::resetZoom(){
     EditorWidget *editor = currentEditor();
     if (editor) editor->resetZoom();
 }
-
-// ============================================================
-// 🆕 创建工具栏
-// ============================================================
-void MainWindow::createToolBars()
-{
-    // 拿到 Qt 的标准图标提供者
+//创建工具栏
+void MainWindow::createToolBars(){
     QStyle *style = this->style();
-
-    // ===== 文件工具栏 =====
+    //文件工具栏
     m_fileToolBar = addToolBar(tr("文件"));
     m_fileToolBar->setObjectName("fileToolBar");   // 用于保存状态
 
-    QAction *newAct = m_fileToolBar->addAction(
-        style->standardIcon(QStyle::SP_FileIcon),
-        tr("新建"));
+    QAction *newAct = m_fileToolBar->addAction(style->standardIcon(QStyle::SP_FileIcon),tr("新建"));
     newAct->setShortcut(QKeySequence::New);
     newAct->setToolTip(tr("新建文件 (Ctrl+N)"));
     connect(newAct, &QAction::triggered, this, &MainWindow::newFile);
 
-    QAction *openAct = m_fileToolBar->addAction(
-        style->standardIcon(QStyle::SP_DialogOpenButton),
-        tr("打开"));
+    QAction *openAct = m_fileToolBar->addAction(style->standardIcon(QStyle::SP_DialogOpenButton),tr("打开"));
     openAct->setShortcut(QKeySequence::Open);
     openAct->setToolTip(tr("打开文件 (Ctrl+O)"));
     connect(openAct, &QAction::triggered, this, &MainWindow::openFile);
 
-    QAction *saveAct = m_fileToolBar->addAction(
-        style->standardIcon(QStyle::SP_DialogSaveButton),
-        tr("保存"));
+    QAction *saveAct = m_fileToolBar->addAction(style->standardIcon(QStyle::SP_DialogSaveButton),tr("保存"));
     saveAct->setShortcut(QKeySequence::Save);
     saveAct->setToolTip(tr("保存文件 (Ctrl+S)"));
     connect(saveAct, &QAction::triggered, this, &MainWindow::saveFile);
-
-    // ===== 编辑工具栏 =====
+    //编辑工具栏
     m_editToolBar = addToolBar(tr("编辑"));
     m_editToolBar->setObjectName("editToolBar");
 
-    QAction *undoAct = m_editToolBar->addAction(
-        style->standardIcon(QStyle::SP_ArrowBack),
-        tr("撤销"));
+    QAction *undoAct = m_editToolBar->addAction(style->standardIcon(QStyle::SP_ArrowBack),tr("撤销"));
     undoAct->setShortcut(QKeySequence::Undo);
     undoAct->setToolTip(tr("撤销 (Ctrl+Z)"));
     connect(undoAct, &QAction::triggered, this, &MainWindow::undo);
 
-    QAction *redoAct = m_editToolBar->addAction(
-        style->standardIcon(QStyle::SP_ArrowForward),
-        tr("重做"));
+    QAction *redoAct = m_editToolBar->addAction(style->standardIcon(QStyle::SP_ArrowForward),tr("重做"));
     redoAct->setShortcut(QKeySequence::Redo);
     redoAct->setToolTip(tr("重做 (Ctrl+Y)"));
     connect(redoAct, &QAction::triggered, this, &MainWindow::redo);
 
     m_editToolBar->addSeparator();
 
-    QAction *findAct = m_editToolBar->addAction(
-        style->standardIcon(QStyle::SP_FileDialogContentsView),
-        tr("查找"));
+    QAction *findAct = m_editToolBar->addAction(style->standardIcon(QStyle::SP_FileDialogContentsView),tr("查找"));
     findAct->setShortcut(QKeySequence::Find);
     findAct->setToolTip(tr("查找和替换 (Ctrl+F)"));
     connect(findAct, &QAction::triggered, this, &MainWindow::showFindReplaceDialog);
 
-        // 🆕 运行工具栏
-    QToolBar *runToolBar = addToolBar(tr("运行"));
-    runToolBar->setObjectName("runToolBar");
-    runToolBar->setIconSize(QSize(20, 20));
-
-    QAction *runAct = runToolBar->addAction(tr("▶ 运行"));
-    runAct->setShortcut(tr("F5"));
-    runAct->setToolTip(tr("运行当前文件 (F5)"));
-    connect(runAct, &QAction::triggered, this, &MainWindow::runCurrentFile);
-
-    QAction *stopAct = runToolBar->addAction(tr("⏹️ 停止"));
-    stopAct->setShortcut(tr("Shift+F5"));
-    stopAct->setToolTip(tr("停止运行 (Shift+F5)"));
-    connect(stopAct, &QAction::triggered, [this]() {
-        if (m_terminalWidget) m_terminalWidget->stopProcess();
-    });
 }
 
-// ===== 🆕 撤销重做槽函数 =====
-void MainWindow::undo()
-{
+void MainWindow::undo(){
     EditorWidget *editor = currentEditor();
     if (editor) editor->undo();
 }
 
-void MainWindow::redo()
-{
+void MainWindow::redo(){
     EditorWidget *editor = currentEditor();
     if (editor) editor->redo();
 }
-
-// ============================================================
-// 🆕 会话保存与恢复
-// ============================================================
-
 void MainWindow::saveSession()
 {
     QSettings settings("MyCompany", "CodeEditor");
+    settings.setValue("geometry", saveGeometry());      
+    settings.setValue("windowState", saveState());      
 
-    // ===== 保存窗口状态 =====
-    settings.setValue("geometry", saveGeometry());       // 窗口大小和位置
-    settings.setValue("windowState", saveState());       // 工具栏位置等
-
-    // ===== 保存打开的文件 =====
-    QStringList openFiles;
+    QStringList openFiles; //保存打开的文件
     QList<int> cursorPositions;
 
-    for (int i = 0; i < m_tabWidget->count(); ++i) {
-        EditorWidget *editor = qobject_cast<EditorWidget *>(m_tabWidget->widget(i));
-        if (editor && !editor->currentFile().isEmpty()) {
+    for (int i=0; i<m_tabWidget->count(); ++i) {
+        EditorWidget *editor=qobject_cast<EditorWidget *>(m_tabWidget->widget(i));
+        if (editor&&!editor->currentFile().isEmpty()){
             openFiles.append(editor->currentFile());
             cursorPositions.append(editor->cursorPosition());
         }
     }
-
     settings.setValue("session/openFiles", openFiles);
-
-    // QSettings 不直接支持 QList<int>，转成 QVariantList
-    QVariantList cursorList;
+    QVariantList cursorList; // QSettings不直接支持QList<int>，只得转成QVariantList
     for (int pos : cursorPositions) {
         cursorList.append(pos);
     }
     settings.setValue("session/cursorPositions", cursorList);
-
-    // 当前激活的标签索引
     settings.setValue("session/currentIndex", m_tabWidget->currentIndex());
         
-    if (m_fileTreeWidget) {// 保存文件树的当前文件夹
-        settings.setValue("fileTree/rootPath", m_fileTreeWidget->rootPath());
-    }
 }
 
-void MainWindow::restoreSession()
-{
+void MainWindow::restoreSession(){
     QSettings settings("MyCompany", "CodeEditor");
-
-    // ===== 恢复窗口大小和位置 =====
     QByteArray geometry = settings.value("geometry").toByteArray();
     if (!geometry.isEmpty()) {
         restoreGeometry(geometry);
     }
-
-    // ===== 恢复工具栏位置等 =====
     QByteArray windowState = settings.value("windowState").toByteArray();
     if (!windowState.isEmpty()) {
         restoreState(windowState);
     }
-
-    // ===== 恢复打开的文件 =====
     QStringList openFiles = settings.value("session/openFiles").toStringList();
     QVariantList cursorList = settings.value("session/cursorPositions").toList();
-
-    if (openFiles.isEmpty()) {
-        return;   // 没有会话可恢复
-    }
-
-    // 移除默认的空白标签（因为构造函数里 createEditor 建了一个）
-    while (m_tabWidget->count() > 0) {
+    if (openFiles.isEmpty()) return;  
+    while (m_tabWidget->count()>0) {
         QWidget *w = m_tabWidget->widget(0);
         m_tabWidget->removeTab(0);
         w->deleteLater();
     }
-
-    // 依次打开每个文件
-    for (int i = 0; i < openFiles.size(); ++i) {
-        QString filePath = openFiles.at(i);
-
-        // 检查文件是否还存在
+    for (int i=0; i<openFiles.size();++i) {
+        QString filePath=openFiles.at(i);
         if (!QFileInfo::exists(filePath)) {
-            continue;   // 跳过已被删除的文件
+            continue;  
         }
-
-        EditorWidget *editor = createEditor();
+        EditorWidget *editor=createEditor();
         if (editor->loadFile(filePath)) {
-            // 恢复光标位置
-            if (i < cursorList.size()) {
-                int pos = cursorList.at(i).toInt();
+            if (i<cursorList.size()) {
+                int pos=cursorList.at(i).toInt();
                 editor->setCursorPosition(pos);
             }
         }
     }
-
-    // 如果所有文件都不存在，恢复一个空白标签
-    if (m_tabWidget->count() == 0) {
+    if (m_tabWidget->count()==0) {
         createEditor();
     }
-
-    // 恢复当前激活的标签
-    int currentIndex = settings.value("session/currentIndex", 0).toInt();
-    if (currentIndex >= 0 && currentIndex < m_tabWidget->count()) {
+    int currentIndex=settings.value("session/currentIndex", 0).toInt();
+    if (currentIndex>=0&&currentIndex<m_tabWidget->count()) {
         m_tabWidget->setCurrentIndex(currentIndex);
     }
 }
-
-// ============================================================
-// 🆕 首选项
-// ============================================================
+//首选项
 void MainWindow::showPreferences()
 {
     PreferencesDialog dialog(this);
-    connect(&dialog, &PreferencesDialog::settingsApplied,
-            this, &MainWindow::applySettingsToAllEditors);
+    connect(&dialog, &PreferencesDialog::settingsApplied,this, &MainWindow::applySettingsToAllEditors);
     dialog.exec();
 }
-
 void MainWindow::applySettingsToAllEditors()
 {
-    // 遍历所有标签，让每个编辑器重新加载设置
-    for (int i = 0; i < m_tabWidget->count(); ++i) {
+    for (int i=0;i<m_tabWidget->count();++i) {
         EditorWidget *editor = qobject_cast<EditorWidget *>(m_tabWidget->widget(i));
         if (editor) {
             editor->applySettings();
         }
     }
 }
-
-// ============================================================
-// 🆕 文件树相关
-// ============================================================
-
-// 切换显示/隐藏
-void MainWindow::toggleFileTree()
-{
-    if (m_fileTreeDock->isVisible()) {
-        m_fileTreeDock->hide();
-        m_toggleFileTreeAction->setChecked(false);
-    } else {
-        m_fileTreeDock->show();
-        m_toggleFileTreeAction->setChecked(true);
-    }
-}
-
-// 打开一个文件夹到文件树
-void MainWindow::openFolderInTree()
-{
-    QString path = QFileDialog::getExistingDirectory(
-        this,
-        tr("选择要浏览的文件夹"),
-        QDir::homePath()
-    );
-
-    if (!path.isEmpty()) {
-        m_fileTreeWidget->setRootPath(path);
-        // 确保文件树是可见的
-        if (!m_fileTreeDock->isVisible()) {
-            m_fileTreeDock->show();
-            m_toggleFileTreeAction->setChecked(true);
-        }
-    }
-}
-
-// 文件树双击 → 打开文件
-void MainWindow::onFileTreeDoubleClicked(const QString &filePath)
-{
-    openFileByPath(filePath);
-}
-
-// ============================================================
-// 🆕 折叠相关
-// ============================================================
+//折叠相关
 void MainWindow::updateFoldCount(int count)
 {
-    if (count > 0) {
+    if (count>0) {
         m_foldCountLabel->setText(tr("🗂️ %1 个折叠").arg(count));
     } else {
         m_foldCountLabel->setText("");
     }
 }
-
 void MainWindow::foldAll()
 {
     EditorWidget *editor = currentEditor();
     if (editor) editor->foldAll();
 }
-
 void MainWindow::unfoldAll()
 {
     EditorWidget *editor = currentEditor();
     if (editor) editor->unfoldAll();
 }
 
-// ============================================================
-// 🆕 任务清单
-// ============================================================
 void MainWindow::toggleTaskList()
 {
-    if (m_taskListDock->isVisible()) {
+    if(m_taskListDock->isVisible()) {
         m_taskListDock->hide();
         m_toggleTaskListAction->setChecked(false);
-    } else {
+    }else{
         m_taskListDock->show();
         m_toggleTaskListAction->setChecked(true);
     }
 }
 
-// ============================================================
-//  任务数量显示
-// ============================================================
 void MainWindow::updateTaskCount(int total, int completed)
 {
-    int pending = total - completed;
-    if (total == 0) {
+    int pending=total-completed;
+    if(total==0) {
         m_taskCountLabel->setText(tr(""));
-    } else {
+    }else{
         m_taskCountLabel->setText(
             tr("📋 %1 待办 / %2 完成").arg(pending).arg(completed)
         );
     }
 }
-
-// ============================================================
-// 🆕 命令面板
-// ============================================================
-void MainWindow::showCommandPalette()
-{
-    m_commandPalette->showPalette();
-}
-
-void MainWindow::registerCommands()
-{
-    // ===== 文件操作 =====
-    m_commandPalette->addCommand({"📄", tr("新建文件"), "Ctrl+N",
-        [this]() { newFile(); }});
-
-    m_commandPalette->addCommand({"📂", tr("打开文件"), "Ctrl+O",
-        [this]() { openFile(); }});
-
-    m_commandPalette->addCommand({"📁", tr("打开文件夹"), "Ctrl+K Ctrl+O",
-        [this]() { openFolderInTree(); }});
-
-    m_commandPalette->addCommand({"💾", tr("保存"), "Ctrl+S",
-        [this]() { saveFile(); }});
-
-    m_commandPalette->addCommand({"💾", tr("另存为..."), "Ctrl+Shift+S",
-        [this]() { saveAsFile(); }});
-
-    // ===== 编辑操作 =====
-    m_commandPalette->addCommand({"↩️", tr("撤销"), "Ctrl+Z",
-        [this]() { undo(); }});
-
-    m_commandPalette->addCommand({"↪️", tr("重做"), "Ctrl+Y",
-        [this]() { redo(); }});
-
-    m_commandPalette->addCommand({"🔍", tr("查找和替换"), "Ctrl+F",
-        [this]() { showFindReplaceDialog(); }});
-
-    // ===== 视图切换 =====
-    m_commandPalette->addCommand({"🌳", tr("显示/隐藏文件浏览器"), "Ctrl+B",
-        [this]() { toggleFileTree(); }});
-
-    m_commandPalette->addCommand({"📋", tr("显示/隐藏任务清单"), "Ctrl+T",
-        [this]() { toggleTaskList(); }});
-
-    // ===== 主题 =====
-    m_commandPalette->addCommand({"🌞", tr("切换到亮色主题"), "",
-        [this]() { switchToLightTheme(); }});
-
-    m_commandPalette->addCommand({"🌙", tr("切换到暗色主题"), "",
-        [this]() { switchToDarkTheme(); }});
-
-    // ===== 字体 =====
-    m_commandPalette->addCommand({"🔎", tr("放大字体"), "Ctrl++",
-        [this]() { zoomIn(); }});
-
-    m_commandPalette->addCommand({"🔎", tr("缩小字体"), "Ctrl+-",
-        [this]() { zoomOut(); }});
-
-    m_commandPalette->addCommand({"🔎", tr("重置字体大小"), "Ctrl+0",
-        [this]() { resetZoom(); }});
-
-    // ===== 代码折叠 =====
-    m_commandPalette->addCommand({"📂", tr("折叠所有"), "Ctrl+K Ctrl+0",
-        [this]() { foldAll(); }});
-
-    m_commandPalette->addCommand({"📖", tr("展开所有"), "Ctrl+K Ctrl+J",
-        [this]() { unfoldAll(); }});
-
-    // ===== 其他 =====
-    m_commandPalette->addCommand({"⚙️", tr("首选项"), "Ctrl+,",
-        [this]() { showPreferences(); }});
-
-    m_commandPalette->addCommand({"❌", tr("退出"), "Ctrl+Q",
-        [this]() { close(); }});
-        m_commandPalette->addCommand({"🤖", tr("显示/隐藏 AI 助手"), "Ctrl+I",
-        [this]() { toggleAiAssistant(); }});
-
-        m_commandPalette->addCommand({"▶", tr("运行当前文件"), "F5",
-        [this]() { runCurrentFile(); }});
-
-    m_commandPalette->addCommand({"⏹️", tr("停止运行"), "Shift+F5",
-        [this]() { if (m_terminalWidget) m_terminalWidget->stopProcess(); }});
-
-    m_commandPalette->addCommand({"📤", tr("显示/隐藏终端"), "Ctrl+`",
-        [this]() { toggleTerminal(); }});
-        m_commandPalette->addCommand({"🧠", tr("新建思维导图"), "",
-        [this]() { newMindMap(); }});
-
-    m_commandPalette->addCommand({"🧠", tr("打开思维导图"), "",
-        [this]() { openMindMap(); }});
-
-    m_commandPalette->addCommand({"🧠", tr("保存思维导图"), "",
-        [this]() { saveMindMap(); }});
-}
-
-// ============================================================
-// 🆕 AI 助手
-// ============================================================
+//AI
 void MainWindow::toggleAiAssistant()
 {
     if (m_aiDock->isVisible()) {
@@ -1217,339 +581,21 @@ void MainWindow::toggleAiAssistant()
     }
 }
 
-// ============================================================
-// 🆕 AI 代码处理接口
-// ============================================================
+//AI代码处理接口，，参考https://github.com/ChengYull/Qt-ChatTool
 void MainWindow::askAiAboutCode(const QString &prompt, const QString &code)
 {
     if (!m_aiAssistantWidget) return;
-
-    // 确保 AI 助手 dock 显示并置前
     m_aiDock->show();
     m_aiDock->raise();
     m_toggleAiAction->setChecked(true);
-
-    // 🆕 如果 prompt 和 code 都是空的，只显示 AI 助手不发送问题
     if (prompt.isEmpty() && code.isEmpty()) {
         return;
     }
-
-    // 组装完整的提问
     QString fullQuestion;
-    if (code.isEmpty()) {
+    if(code.isEmpty()) {
         fullQuestion = prompt;
-    } else {
+    }else{
         fullQuestion = QString("%1\n\n```\n%2\n```").arg(prompt, code);
     }
-
-    // 调用 AI 助手的公有方法提问
     m_aiAssistantWidget->askQuestion(fullQuestion);
-}
-
-// ============================================================
-// 🆕 运行代码
-// ============================================================
-void MainWindow::runCurrentFile()
-{
-    EditorWidget *editor = currentEditor();
-    if (!editor) return;
-
-    QString filePath = editor->currentFile();
-    if (filePath.isEmpty()) {
-        QMessageBox::information(this, tr("提示"),
-                                  tr("请先保存文件后再运行"));
-        return;
-    }
-
-    // 如果文件有未保存修改，先保存
-    if (editor->isModified()) {
-        editor->save();
-    }
-
-    // 显示终端 dock
-    m_terminalDock->show();
-    m_toggleTerminalAction->setChecked(true);
-
-    // 运行
-    m_terminalWidget->runFile(filePath);
-}
-
-void MainWindow::toggleTerminal()
-{
-    if (m_terminalDock->isVisible()) {
-        m_terminalDock->hide();
-        m_toggleTerminalAction->setChecked(false);
-    } else {
-        m_terminalDock->show();
-        m_toggleTerminalAction->setChecked(true);
-    }
-}
-
-// ============================================================
-// 🆕 模式切换工具栏
-// ============================================================
-void MainWindow::createModeSwitcher()
-{
-    m_modeToolBar = addToolBar(tr("模式"));
-    m_modeToolBar->setObjectName("modeToolBar");
-    m_modeToolBar->setMovable(false);   // 不允许拖动
-    m_modeToolBar->setStyleSheet(
-        "QToolBar { spacing: 4px; padding: 4px; }"
-        "QToolButton { padding: 6px 12px; font-size: 13px; }"
-        "QToolButton:checked { background: #0078D4; color: white; }"
-    );
-
-    // 用 ActionGroup 让两个按钮互斥
-    QActionGroup *group = new QActionGroup(this);
-
-    m_editorModeAction = new QAction(tr("📝 编辑器"), this);
-    m_editorModeAction->setCheckable(true);
-    m_editorModeAction->setChecked(true);   // 默认选中
-    group->addAction(m_editorModeAction);
-    m_modeToolBar->addAction(m_editorModeAction);
-    connect(m_editorModeAction, &QAction::triggered,
-            this, &MainWindow::switchToEditorMode);
-
-    m_mindMapModeAction = new QAction(tr("🧠 思维导图"), this);
-    m_mindMapModeAction->setCheckable(true);
-    group->addAction(m_mindMapModeAction);
-    m_modeToolBar->addAction(m_mindMapModeAction);
-    connect(m_mindMapModeAction, &QAction::triggered,
-            this, &MainWindow::switchToMindMapMode);
-
-    // 把模式工具栏放到最前面（其他工具栏后面已经加了）
-    insertToolBarBreak(m_modeToolBar);   // 换行显示
-}
-
-// ===== 切换到编辑器模式 =====
-void MainWindow::switchToEditorMode()
-{
-    m_modeStack->setCurrentIndex(0);
-    m_editorModeAction->setChecked(true);
-    statusBar()->showMessage(tr("已切换到编辑器模式"), 2000);
-    setWindowTitle(tr("CodeEditor"));   // 🆕 恢复默认标题
-}
-
-// ===== 切换到思维导图模式 =====
-void MainWindow::switchToMindMapMode()
-{
-    m_modeStack->setCurrentIndex(1);
-    m_mindMapModeAction->setChecked(true);
-    statusBar()->showMessage(tr("已切换到思维导图模式"), 2000);
-        updateWindowTitleForMindMap();   // 🆕 更新标题
-}
-
-// ============================================================
-// 🆕 思维导图文件操作
-// ============================================================
-void MainWindow::newMindMap()
-{
-    if (!m_mindMapView) return;
-
-    // 切到思维导图模式
-    switchToMindMapMode();
-
-    m_mindMapView->newMindMap();
-}
-
-void MainWindow::openMindMap()
-{
-    if (!m_mindMapView) return;
-
-    QString filePath = QFileDialog::getOpenFileName(
-        this,
-        tr("打开思维导图"),
-        QString(),
-        tr("思维导图文件 (*.qmind);;所有文件 (*)"));
-
-    if (filePath.isEmpty()) return;
-
-    // 切到思维导图模式
-    switchToMindMapMode();
-
-    m_mindMapView->loadFromFile(filePath);
-}
-
-void MainWindow::saveMindMap()
-{
-    if (!m_mindMapView) return;
-
-    if (m_mindMapView->currentFile().isEmpty()) {
-        // 从未保存过，走另存为
-        saveAsMindMap();
-        return;
-    }
-
-    m_mindMapView->saveToFile(m_mindMapView->currentFile());
-}
-
-void MainWindow::saveAsMindMap()
-{
-    if (!m_mindMapView) return;
-
-    QString filePath = QFileDialog::getSaveFileName(
-        this,
-        tr("保存思维导图"),
-        QString("mindmap.qmind"),
-        tr("思维导图文件 (*.qmind);;所有文件 (*)"));
-
-    if (filePath.isEmpty()) return;
-
-    // 如果没有扩展名，加上 .qmind
-    if (!filePath.endsWith(".qmind", Qt::CaseInsensitive)) {
-        filePath += ".qmind";
-    }
-
-    m_mindMapView->saveToFile(filePath);
-}
-
-// ===== 更新窗口标题（思维导图模式下）=====
-void MainWindow::updateWindowTitleForMindMap()
-{
-    if (!m_mindMapView) return;
-
-    QString title = tr("CodeEditor");
-
-    // 只在思维导图模式下更新
-    if (m_modeStack && m_modeStack->currentIndex() == 1) {
-        QString fileName = m_mindMapView->currentFile();
-        if (fileName.isEmpty()) {
-            fileName = tr("未命名思维导图");
-        } else {
-            fileName = QFileInfo(fileName).fileName();
-        }
-
-        QString modified = m_mindMapView->isModified() ? " *" : "";
-        title = QString("%1%2 - %3").arg(fileName, modified, title);
-    }
-
-    setWindowTitle(title);
-}
-
-// ============================================================
-// 🆕 思维导图撤销/重做
-// ============================================================
-void MainWindow::mindMapUndo()
-{
-    if (!m_mindMapView) return;
-
-    // 只在思维导图模式下才响应
-    if (m_modeStack && m_modeStack->currentIndex() == 1) {
-        m_mindMapView->undo();
-    } else {
-        // 编辑器模式：走原来的撤销
-        undo();
-    }
-}
-
-void MainWindow::mindMapRedo()
-{
-    if (!m_mindMapView) return;
-
-    if (m_modeStack && m_modeStack->currentIndex() == 1) {
-        m_mindMapView->redo();
-    } else {
-        redo();
-    }
-}
-
-// ============================================================
-// 🆕 导出思维导图图片
-// ============================================================
-void MainWindow::exportMindMapImage()
-{
-    if (!m_mindMapView) return;
-
-    QString filePath = QFileDialog::getSaveFileName(
-        this,
-        tr("导出为 PNG"),
-        QString("mindmap.png"),
-        tr("PNG 图片 (*.png);;所有文件 (*)"));
-
-    if (filePath.isEmpty()) return;
-
-    if (!filePath.endsWith(".png", Qt::CaseInsensitive)) {
-        filePath += ".png";
-    }
-
-    if (m_mindMapView->exportToImage(filePath)) {
-        QMessageBox::information(this, tr("成功"),
-                                 tr("图片已导出到：\n%1").arg(filePath));
-    } else {
-        QMessageBox::warning(this, tr("失败"),
-                             tr("导出失败"));
-    }
-}
-
-// ============================================================
-// 🆕 AI 展开思维导图节点
-// ============================================================
-void MainWindow::requestAiExpandFromNode(QVariant nodePtrVar)
-{
-    MindNode *node = reinterpret_cast<MindNode*>(nodePtrVar.value<quintptr>());
-    if (!node || !m_aiAssistantWidget) return;
-
-    // 收集已有子节点标题
-    QStringList existing;
-    for (MindNode *child : node->childNodes()) {
-        if (child) existing.append(child->text());
-    }
-
-    QString parentTopic = node->text();
-
-    // 显示对话框
-    MindMapAiDialog *dialog = new MindMapAiDialog(parentTopic, this);
-    dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setProperty("nodePtr",
-        QVariant::fromValue(reinterpret_cast<quintptr>(node)));
-
-    // 一次性连接（关闭对话框时断开）
-    QMetaObject::Connection connReady = connect(
-        m_aiAssistantWidget, &AiAssistantWidget::topicSuggestionsReady,
-        dialog, [dialog](const QStringList &topics) {
-            dialog->setSuggestions(topics);
-        });
-
-    QMetaObject::Connection connError = connect(
-        m_aiAssistantWidget, &AiAssistantWidget::topicSuggestionsError,
-        dialog, [dialog](const QString &err) {
-            dialog->showError(err);
-        });
-
-    connect(dialog, &QDialog::finished, this,
-            [this, connReady, connError, dialog](int result) {
-        disconnect(connReady);
-        disconnect(connError);
-
-        if (result == QDialog::Accepted) {
-            QStringList selected = dialog->selectedTopics();
-            MindNode *parentNode = reinterpret_cast<MindNode*>(
-                dialog->property("nodePtr").value<quintptr>());
-
-            if (parentNode && parentNode->scene() && m_mindMapView) {
-                int i = 0;
-                for (const QString &topic : selected) {
-                    QString newId = QString("node_%1_%2")
-                        .arg(QDateTime::currentMSecsSinceEpoch())
-                        .arg(i);
-
-                    int childCount = parentNode->childNodes().size() + 1;
-                    qreal offsetX = 200;
-                    qreal offsetY = (childCount - 1) * 80 - (childCount / 2) * 40;
-                    QPointF newPos(
-                        parentNode->pos().x() + offsetX,
-                        parentNode->pos().y() + offsetY);
-
-                    AddNodeCommand *cmd = new AddNodeCommand(
-                        parentNode->scene(), parentNode, topic, newPos, newId);
-                    m_mindMapView->undoStack()->push(cmd);
-                    i++;
-                }
-            }
-        }
-    });
-
-    dialog->show();
-
-    m_aiAssistantWidget->requestTopicSuggestions(parentTopic, existing);
 }

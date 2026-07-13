@@ -5,23 +5,19 @@
 #include <QStringList>
 #include <QVector>
 
-// 自定义匹配规则（比如 Qt 类、Python 装饰器等）
 struct CustomPattern {
-    QString name;      // 规则名（便于识别）
-    QString pattern;   // 正则表达式
-    QString color;     // 对应主题里的颜色名
+    QString name;      //规则名
+    QString pattern;   //正则表达式
+    QString color;     //颜色名
 };
 
-// 一个语法定义 = 一个 JSON 文件的内容
 class SyntaxDefinition
 {
 public:
     SyntaxDefinition();
-
-    // 从 JSON 文件加载
+    //从JSON文件
     bool loadFromFile(const QString &filePath);
-
-    // 属性访问
+    //属性访问
     QString name() const { return m_name; }
     QStringList extensions() const { return m_extensions; }
     QStringList keywords() const { return m_keywords; }
@@ -37,8 +33,6 @@ public:
     QString preprocessorPattern() const { return m_preprocessorPattern; }
 
     QVector<CustomPattern> customPatterns() const { return m_customPatterns; }
-
-    // 判断文件扩展名是否匹配这个语言
     bool matchesExtension(const QString &ext) const;
 
 private:

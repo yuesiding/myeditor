@@ -1,6 +1,5 @@
 #include "preferencesdialog.h"
 #include "thememanager.h"
-
 #include <QListWidget>
 #include <QStackedWidget>
 #include <QFontComboBox>
@@ -15,48 +14,40 @@
 #include <QGroupBox>
 #include <QSettings>
 
-PreferencesDialog::PreferencesDialog(QWidget *parent)
-    : QDialog(parent)
+PreferencesDialog::PreferencesDialog(QWidget *parent):QDialog(parent)
 {
     setWindowTitle(tr("首选项"));
     setMinimumSize(600, 400);
-
     setupUi();
     loadSettings();
 }
 
 void PreferencesDialog::setupUi()
 {
-    // ===== 左侧分类列表 =====
+    //左侧分类
     m_categoryList = new QListWidget(this);
     m_categoryList->addItem(tr("编辑器"));
     m_categoryList->addItem(tr("主题"));
     m_categoryList->setCurrentRow(0);
     m_categoryList->setMaximumWidth(150);
-
-    // ===== 右侧内容堆叠 =====
+    //右侧内容
     m_pagesStack = new QStackedWidget(this);
     createEditorPage();
     createThemePage();
     m_pagesStack->addWidget(m_editorPage);
     m_pagesStack->addWidget(m_themePage);
+    //切换分类时切换页面
+    connect(m_categoryList, &QListWidget::currentRowChanged,m_pagesStack, &QStackedWidget::setCurrentIndex);
 
-    // 切换分类时切换页面
-    connect(m_categoryList, &QListWidget::currentRowChanged,
-            m_pagesStack, &QStackedWidget::setCurrentIndex);
-
-    // ===== 底部按钮 =====
+    //底部按钮
     m_okButton = new QPushButton(tr("确定"), this);
     m_cancelButton = new QPushButton(tr("取消"), this);
     m_applyButton = new QPushButton(tr("应用"), this);
-
     m_okButton->setDefault(true);
-
     connect(m_okButton, &QPushButton::clicked, this, &PreferencesDialog::onOkClicked);
     connect(m_cancelButton, &QPushButton::clicked, this, &QDialog::reject);
     connect(m_applyButton, &QPushButton::clicked, this, &PreferencesDialog::onApplyClicked);
-
-    // ===== 布局 =====
+    //布局
     QHBoxLayout *topLayout = new QHBoxLayout;
     topLayout->addWidget(m_categoryList);
     topLayout->addWidget(m_pagesStack, 1);
@@ -77,12 +68,10 @@ void PreferencesDialog::createEditorPage()
 {
     m_editorPage = new QWidget(this);
 
-    // ===== 字体组 =====
     QGroupBox *fontGroup = new QGroupBox(tr("字体设置"), m_editorPage);
     QFormLayout *fontLayout = new QFormLayout(fontGroup);
-
     m_fontComboBox = new QFontComboBox(fontGroup);
-    // 只显示等宽字体（更适合代码编辑）
+
     m_fontComboBox->setFontFilters(QFontComboBox::MonospacedFonts);
     fontLayout->addRow(tr("字体名称:"), m_fontComboBox);
 
@@ -91,7 +80,6 @@ void PreferencesDialog::createEditorPage()
     m_fontSizeSpin->setSuffix(tr(" pt"));
     fontLayout->addRow(tr("字体大小:"), m_fontSizeSpin);
 
-    // ===== 编辑选项组 =====
     QGroupBox *editGroup = new QGroupBox(tr("编辑选项"), m_editorPage);
     QVBoxLayout *editLayout = new QVBoxLayout(editGroup);
 
@@ -103,7 +91,6 @@ void PreferencesDialog::createEditorPage()
     editLayout->addWidget(m_highlightCurrentLineCheck);
     editLayout->addWidget(m_matchBracketsCheck);
 
-    // Tab 大小
     QHBoxLayout *tabLayout = new QHBoxLayout;
     tabLayout->addWidget(new QLabel(tr("Tab 大小:"), editGroup));
     m_tabSizeSpin = new QSpinBox(editGroup);
@@ -113,7 +100,6 @@ void PreferencesDialog::createEditorPage()
     tabLayout->addStretch();
     editLayout->addLayout(tabLayout);
 
-    // 页面布局
     QVBoxLayout *layout = new QVBoxLayout(m_editorPage);
     layout->addWidget(fontGroup);
     layout->addWidget(editGroup);
@@ -140,24 +126,14 @@ void PreferencesDialog::createThemePage()
 void PreferencesDialog::loadSettings()
 {
     QSettings settings("MyCompany", "CodeEditor");
-
-    // 编辑器设置
     QString fontName = settings.value("editor/fontName", "Consolas").toString();
     m_fontComboBox->setCurrentFont(QFont(fontName));
-
     int fontSize = settings.value("editor/fontSize", 11).toInt();
     m_fontSizeSpin->setValue(fontSize);
-
-    m_showLineNumbersCheck->setChecked(
-        settings.value("editor/showLineNumbers", true).toBool());
-    m_highlightCurrentLineCheck->setChecked(
-        settings.value("editor/highlightCurrentLine", true).toBool());
-    m_matchBracketsCheck->setChecked(
-        settings.value("editor/matchBrackets", true).toBool());
-
+    m_showLineNumbersCheck->setChecked(settings.value("editor/showLineNumbers", true).toBool());
+    m_highlightCurrentLineCheck->setChecked(settings.value("editor/highlightCurrentLine", true).toBool());
+    m_matchBracketsCheck->setChecked(settings.value("editor/matchBrackets", true).toBool());
     m_tabSizeSpin->setValue(settings.value("editor/tabSize", 4).toInt());
-
-    // 主题设置
     QString theme = settings.value("theme/current", "light").toString();
     int idx = m_themeCombo->findData(theme);
     if (idx >= 0) {
@@ -168,8 +144,6 @@ void PreferencesDialog::loadSettings()
 void PreferencesDialog::saveSettings()
 {
     QSettings settings("MyCompany", "CodeEditor");
-
-    // 编辑器设置
     settings.setValue("editor/fontName", m_fontComboBox->currentFont().family());
     settings.setValue("editor/fontSize", m_fontSizeSpin->value());
     settings.setValue("editor/showLineNumbers", m_showLineNumbersCheck->isChecked());
@@ -177,12 +151,11 @@ void PreferencesDialog::saveSettings()
     settings.setValue("editor/matchBrackets", m_matchBracketsCheck->isChecked());
     settings.setValue("editor/tabSize", m_tabSizeSpin->value());
 
-    // 主题设置
     QString theme = m_themeCombo->currentData().toString();
     settings.setValue("theme/current", theme);
-    if (theme == "dark") {
+    if(theme=="dark"){
         ThemeManager::instance().setDarkTheme();
-    } else {
+    }else{
         ThemeManager::instance().setLightTheme();
     }
 }

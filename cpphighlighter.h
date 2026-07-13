@@ -3,14 +3,11 @@
 
 #include "highlighter.h"
 
-class CppHighlighter : public Highlighter
+class CppHighlighter:public Highlighter
 {
     Q_OBJECT
-
 public:
     explicit CppHighlighter(QTextDocument *parent = nullptr);
-
-    // 🆕 实现基类的虚函数
     void setupRules() override;
 };
 

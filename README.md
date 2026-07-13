@@ -2,16 +2,16 @@
 
 # 📝 MyEditor
 
-**一个用 Qt 5 + C++ 开发的轻量级多语言代码编辑器**
+**一个用 Qt 5 + C++ 开发的轻量级代码编辑器**
 
-*支持语法高亮、代码折叠、多标签编辑等专业功能*
+*内置多语言语法高亮、任务清单、AI 智能助手*
 
 ![Qt](https://img.shields.io/badge/Qt-5.14.2-41CD52?logo=qt&logoColor=white)
 ![C++](https://img.shields.io/badge/C++-17-00599C?logo=cplusplus&logoColor=white)
 ![CMake](https://img.shields.io/badge/CMake-3.16+-064F8C?logo=cmake&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-![Version](https://img.shields.io/badge/Version-4.0.0-brightgreen)
+
 </div>
 
 ---
@@ -21,7 +21,7 @@
 ### 📝 编辑功能
 
 - 📑 **多标签页编辑** — 同时打开和编辑多个文件
-- 🎨 **语法高亮** — 内置支持 C++、Python、JSON
+- 🎨 **实时语法高亮** — 内置支持 C++、Python、JSON 三种语言
 - 📐 **行号显示** 与当前行高亮
 - 🔗 **括号匹配** — 光标旁的括号自动高亮
 - 📂 **代码折叠** — 折叠函数/类，聚焦当前工作
@@ -31,66 +31,33 @@
 ### 🎨 界面
 
 - 🌗 **亮/暗主题** — 一键切换
-- 🌳 **文件树侧边栏** — 像 VSCode 一样浏览项目
 - 🛠️ **工具栏** — 常用操作一键触发
 - 📊 **专业状态栏** — 显示行列号、字符数、折叠数
+- ⚙️ **首选项对话框** — 字体、缩进、主题可自定义
 
-### 💡 用户体验
-
-- 💾 **会话恢复** — 重启后自动打开上次的文件
-- 📌 **最近文件** — 快速访问最近打开的 10 个文件
-- 🖱️ **拖拽打开** — 拖文件到窗口即可打开
-- ⌨️ **命令行支持** — `myeditor.exe file.cpp`
-- 🔎 **字体缩放** — Ctrl + 鼠标滚轮
-- 
 ### 📋 任务管理
 
 - ✅ **内置任务清单** — 右侧侧边栏管理待办事项
-- 🎯 **优先级标记** — 高/中/低三级优先级，不同颜色区分
+- 🎯 **优先级标记** — 高/中/低三级优先级
 - 🔍 **智能筛选** — 按全部/未完成/已完成筛选
-- 💾 **自动持久化** — 所有任务自动保存，重启后恢复
-- 📊 **实时统计** — 状态栏显示待办和完成数
-- 🖱️ **便捷操作** — 双击编辑，右键复制/置顶/置底
+- 💾 **自动持久化** — 任务数据自动保存
 
 ### 🤖 AI 智能助手
 
-- 💬 **AI 对话**：内置 DeepSeek AI 助手，可自由问答
-- 📝 **代码解释**：选中代码右键，AI 秒懂
-- 🚀 **代码优化**：AI 给出优化建议
-- 🐛 **AI 找 Bug**：智能分析潜在问题
-- 💡 **代码翻译**：一键转换为 Python
-- 📖 **Markdown 渲染**：AI 回复漂亮排版
+- 💬 **AI 对话** — 内置 DeepSeek AI 助手，可自由问答
+- 📝 **代码解释** — 选中代码右键，AI 秒懂
+- 🚀 **代码优化** — AI 给出优化建议
+- 🐛 **AI 找 Bug** — 智能分析潜在问题
+- 💡 **代码翻译** — 一键转换为其他语言
 
-### 🚀 代码运行
+### 💾 数据管理
 
-- ▶️ **一键运行**：F5 执行当前文件
-- 🔨 **自动编译**：C++/C 文件自动编译再运行
-- 🖥️ **内置终端**：底部面板显示程序输出
-- ⏹️ **随时中断**：Shift+F5 停止运行
-- 🎨 **多语言支持**：Python、JavaScript、C++、C、Batch
-
-### 🎨 视觉体验
-
-- ⚡ **命令面板**：Ctrl+Shift+P 快速执行所有命令
-- 🗺️ **迷你地图**：右侧代码缩略图
-- 🌗 **亮/暗主题**：一键切换
-
-### 🧠 思维导图（v4.0 新增！）
-
-- 🎨 **可视化画布** — 无限画布，滚轮缩放，中键拖动
-- 🎯 **节点系统** — 中心主题 + 子节点，贝塞尔曲线连接
-- ⌨️ **快捷操作** — Tab 添加子节点，Enter 添加同级
-- ✨ **AI 联动** — 选中节点，AI 自动生成子话题！
-- 🎨 **样式定制** — 颜色、形状、可折叠子分支
-- 💾 **完整持久化** — 保存为 .qmind (JSON) 文件
-- 🖼️ **导出 PNG** — 一键导出为高清图片
-- ↶ **撤销重做** — 完整的命令模式
-- 🌗 **主题适配** — 亮/暗主题下都好看
+- 💾 **会话恢复** — 重启后自动打开上次的文件
+- ❓ **未保存提示** — 关闭时智能提醒
 
 ### 🔧 可扩展性
 
 - 📦 **数据驱动** — 语法规则用 JSON 定义，加新语言无需修改代码
-- ⚙️ **首选项对话框** — 字体、缩进、主题等可自定义
 
 ---
 
@@ -110,15 +77,12 @@
 | **编译器** | MinGW 7.3.0 (64-bit) |
 | **AI 服务** | DeepSeek API |
 | **网络** | Qt Network + OpenSSL |
+
 ---
 
 ## 🚀 快速开始
 
-### 方式一：直接使用发布版
-
-如果你不想自己编译，可以直接下载 [Releases](https://github.com/yuesiding/myeditor/releases) 里的 ZIP 包，解压后双击 `CodeEditor.exe` 即可运行。
-
-### 方式二：从源码编译
+### 从源码编译
 
 **依赖**：
 
@@ -146,6 +110,15 @@ mingw32-make
 
 编译完成后，`build/` 目录下会生成 `CodeEditor.exe`。
 
+### 使用 AI 助手（可选）
+
+如需使用 AI 助手功能：
+
+1. 注册 [DeepSeek](https://platform.deepseek.com) 账号（新用户送免费额度）
+2. 在 API keys 页面创建 API key
+3. 打开编辑器 → AI 助手侧边栏 → 点击 "🔑 设置 API Key"
+4. 粘贴 API key 并保存
+
 ---
 
 ## 🎓 项目背景
@@ -156,10 +129,16 @@ mingw32-make
 
 - **Qt 核心类**：`QMainWindow`、`QPlainTextEdit`、`QTabWidget`
 - **语法高亮**：`QSyntaxHighlighter` + `QRegularExpression`
+- **网络通信**：`QNetworkAccessManager`（AI 助手）
+- **JSON 解析**：`QJsonDocument`（语法定义 + 任务持久化）
+- **数据持久化**：`QSettings`（会话恢复 + 用户设置）
+
+### 设计模式
+
 - **单例模式**：`ThemeManager`、`SyntaxManager`
-- **观察者模式**：信号槽机制
-- **MVC 模式**：`QFileSystemModel` + `QTreeView`
-- **配置驱动**：JSON 语法定义，可扩展架构
+- **观察者模式**：Qt 信号槽机制
+- **模板方法模式**：`Highlighter` 基类 + `GenericHighlighter` 子类
+- **数据驱动**：JSON 配置替代硬编码
 
 ---
 
@@ -169,16 +148,18 @@ mingw32-make
 myeditor/
 ├── main.cpp                        # 程序入口
 ├── mainwindow.{h,cpp}              # 主窗口
-├── editorwidget.{h,cpp}            # 编辑器控件
+├── editorwidget.{h,cpp}            # 编辑器控件（含行号栏、折叠区）
 ├── highlighter.{h,cpp}             # 高亮器基类
 ├── generichighlighter.{h,cpp}      # 通用高亮器（数据驱动）
 ├── syntaxdefinition.{h,cpp}        # 语法定义
 ├── syntaxmanager.{h,cpp}           # 语法管理器（单例）
 ├── theme.{h,cpp}                   # 主题
 ├── thememanager.{h,cpp}            # 主题管理器（单例）
-├── findreplacedialog.{h,cpp}       # 查找替换对话框
-├── preferencesdialog.{h,cpp}       # 首选项对话框
-├── filetreewidget.{h,cpp}          # 文件树
+├── findreplacedialog.{h,cpp}      # 查找替换对话框
+├── preferencesdialog.{h,cpp}      # 首选项对话框
+├── tasklistwidget.{h,cpp}          # 任务清单
+├── task.h                          # 任务数据结构
+├── aiassistantwidget.{h,cpp}      # AI 助手
 ├── syntax/                         # 语法定义 JSON
 │   ├── cpp.json
 │   ├── python.json
@@ -218,39 +199,56 @@ myeditor/
 
 ## ⌨️ 快捷键
 
+### 文件操作
+
 | 快捷键 | 功能 |
 |--------|------|
 | `Ctrl + N` | 新建文件 |
 | `Ctrl + O` | 打开文件 |
 | `Ctrl + S` | 保存文件 |
 | `Ctrl + Shift + S` | 另存为 |
-| `Ctrl + F` | 查找与替换 |
+| `Ctrl + Q` | 退出 |
+
+### 编辑操作
+
+| 快捷键 | 功能 |
+|--------|------|
 | `Ctrl + Z` | 撤销 |
 | `Ctrl + Y` | 重做 |
-| `Ctrl + B` | 显示/隐藏文件浏览器 |
+| `Ctrl + X / C / V` | 剪切 / 复制 / 粘贴 |
+| `Ctrl + F` | 查找与替换 |
+
+### 视图操作
+
+| 快捷键 | 功能 |
+|--------|------|
+| `Ctrl + T` | 显示/隐藏任务清单 |
+| `Ctrl + I` | 显示/隐藏 AI 助手 |
 | `Ctrl + ,` | 打开首选项 |
 | `Ctrl + +` | 放大字体 |
 | `Ctrl + -` | 缩小字体 |
 | `Ctrl + 0` | 重置字体大小 |
 | `Ctrl + K, Ctrl + 0` | 折叠所有 |
 | `Ctrl + K, Ctrl + J` | 展开所有 |
-| `Ctrl + T` | 显示/隐藏任务清单 |
-| `Ctrl + Shift + P` | 打开命令面板 |
-| `Ctrl + I` | 显示/隐藏 AI 助手 |
-| `F5` | 运行当前文件 |
-| `Shift + F5` | 停止运行 |
-| `` Ctrl + ` `` | 显示/隐藏终端 |
-### 🧠 思维导图模式
 
-| `Tab` | 添加子节点 |
-| `Enter` | 添加同级节点 |
-| `Delete` | 删除选中节点 |
-| `F2` | 编辑节点 |
-| `Ctrl+A` | 全选 |
-| `Ctrl+Z` | 撤销 |
-| `Ctrl+Y` | 重做 |
-| `+` / `-` | 缩放 |
-| `0` | 重置视图 |
+---
+
+## 🎯 主要功能演示
+
+### 语法高亮
+打开 `.cpp` / `.py` / `.json` 文件，编辑器会**自动识别**并应用对应的高亮规则。
+
+### AI 助手
+- 在编辑器中**选中一段代码**
+- **右键** → 选择 "🤖 AI 解释这段代码" / "🚀 AI 优化" / "🐛 AI 找 Bug"
+- AI 助手侧边栏自动弹出并显示分析结果
+
+### 任务清单
+- 右侧 "📋 任务清单" 面板
+- 输入任务 → 回车添加
+- 点击复选框标记完成
+- 右键任务可修改优先级
+
 ---
 
 ## 📄 License
@@ -262,6 +260,7 @@ myeditor/
 ## 🙏 致谢
 
 - 感谢 [Qt](https://www.qt.io/) 团队提供如此强大的 GUI 框架
+- 感谢 [DeepSeek](https://platform.deepseek.com) 提供高质量的 AI API 服务
 - 感谢所有开源社区的贡献者
 
 ---
